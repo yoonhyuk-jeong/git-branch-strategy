@@ -16,5 +16,12 @@ public class Main {
 
         System.out.println("function 2");
         System.out.println("function 2");
+
+        System.out.println("i = " + i);    System.out.println("i = " + i);    System.out.println("i = " + i);    System.out.println("i = " + i);    System.out.println("i = " + i);
+
+
+        System.out.println("function 1 ");
+        System.out.println("function 1 ");
+        System.out.println("function 1 ");
     }
 }
