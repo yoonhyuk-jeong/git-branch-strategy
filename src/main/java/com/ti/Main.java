@@ -24,4 +24,6 @@ public class Main {
         System.out.println("function 1 ");
         System.out.println("function 1 ");
     }
+
+      System.out.println("hotfix ");
 }
