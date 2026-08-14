@@ -1,0 +1,53 @@
+# v4 12절: test = workflow_dispatch (소스: test 브랜치)
+# QA가 검증 시작 시점을 통제한다 — 검증 중 다른 기능이 test에 merge돼도 환경이 덮어써지지 않는다.
+# 샌드박스용 더미 — 실제 배포 없이 build + 태그 출력만 한다.
+name: Test dispatch build & Deploy (dummy)
+
+on:
+  workflow_dispatch:
+    # Actions 탭 > Run workflow 에서 배포할 브랜치를 선택해 수동 실행 (기본 소스 = test)
+
+permissions:
+  contents: read
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # "master 대비 무엇이 올라갔나" 판독용 (v4 2절)
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'corretto'
+          cache: 'gradle'
+
+      # v4 3절: test 환경 배포 소스는 test 브랜치로 고정하는 것이 기본.
+      # 예외(감사 요건상 release 후보 스모크)는 경고만 남기고 통과시킨다.
+      - name: Warn if source is not the test branch
+        if: github.ref_name != 'test'
+        run: |
+          echo "::warning title=비표준 소스::test 환경 기본 소스는 'test' 브랜치입니다 (현재: ${GITHUB_REF_NAME}). release 후보 스모크라면 종료 후 test 브랜치를 재배포하세요 (v4 3절)."
+
+      - name: Build
+        run: ./gradlew build --no-daemon
+
+      - name: Deploy (dummy)
+        run: |
+          VERSION=$(grep -oP 'CURRENT = "\K[^"]+' src/main/java/com/ti/Version.java)
+          echo "::notice title=TEST deploy::env=test ref=${GITHUB_REF_NAME} image=ti-server:v${VERSION} / ti-server:sha-${GITHUB_SHA::7}"
+          {
+            echo "## 🟡 TEST 배포 (dummy) — QA 게이트"
+            echo "- 트리거: \`workflow_dispatch\` (QA가 시점 통제)"
+            echo "- 소스 브랜치: \`${GITHUB_REF_NAME}\`"
+            echo "- 이미지 태그: \`ti-server:v${VERSION}\` / \`ti-server:sha-${GITHUB_SHA::7}\`"
+            echo ""
+            echo "### 이 배포에 들어있는 기능 (master 대비)"
+            echo '```'
+            git log --merges --oneline "${GITHUB_SHA}" --not origin/master || echo "(master 대비 추가 merge 없음)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

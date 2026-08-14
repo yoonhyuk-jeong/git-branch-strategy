@@ -1,0 +1,62 @@
+# v4 12절: uat = workflow_dispatch (소스: release-{날짜} 또는 fast path feature)
+#   v3의 "release push 자동" 목표는 폐기됨 — release가 여러 개 열려 있을 때 검증 중인 UAT를 덮어쓰기 때문.
+# 샌드박스용 더미 — 실제 배포 없이 build + 태그 출력만 한다.
+name: UAT dispatch build & Deploy (dummy)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# UAT는 단일 환경 — 한 번에 하나의 release만 점유 (v4 5절 3단계)
+concurrency:
+  group: uat-environment
+  cancel-in-progress: false
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # v4 12절 보조 권장: fast path용 "master ancestor 확인" 가드 — 낡은 feature 브랜치 배포 방지.
+      # release-* 는 master에서 새로 따므로 통과하고, 오래 방치된 feature는 여기서 걸린다.
+      - name: Guard — master ancestor 확인
+        run: |
+          if git merge-base --is-ancestor origin/master "${GITHUB_SHA}"; then
+            echo "✅ master가 ancestor — UAT 트리 = master + 이 기능"
+          else
+            echo "::error title=낡은 소스::${GITHUB_REF_NAME} 에 최신 master가 반영되지 않았습니다. 로컬에서 'git merge master' 후 다시 dispatch하세요 (v4 8절)."
+            exit 1
+          fi
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'corretto'
+          cache: 'gradle'
+
+      - name: Build
+        run: ./gradlew build --no-daemon
+
+      - name: Deploy (dummy)
+        run: |
+          VERSION=$(grep -oP 'CURRENT = "\K[^"]+' src/main/java/com/ti/Version.java)
+          echo "::notice title=UAT deploy::env=uat ref=${GITHUB_REF_NAME} image=ti-server:v${VERSION} / ti-server:sha-${GITHUB_SHA::7}"
+          {
+            echo "## 🟠 UAT 배포 (dummy) — 최종 게이트"
+            echo "- 트리거: \`workflow_dispatch\` (다중 release 대비 수동 통제)"
+            echo "- 소스 브랜치: \`${GITHUB_REF_NAME}\`"
+            echo "- 이미지 태그: \`ti-server:v${VERSION}\` / \`ti-server:sha-${GITHUB_SHA::7}\`"
+            echo ""
+            echo "### UAT에 올라간 배포 후보 (master 대비)"
+            echo '```'
+            git log --merges --oneline "${GITHUB_SHA}" --not origin/master || echo "(단건 fast path — merge 없음)"
+            echo '```'
+            echo "> 이 SHA가 prod에 나갈 SHA와 같아야 한다. 배포 직전 \`git diff ${GITHUB_REF_NAME} master\` 로 확인 (v4 4.1절)."
+          } >> "$GITHUB_STEP_SUMMARY"

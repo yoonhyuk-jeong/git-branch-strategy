@@ -1,5 +1,9 @@
 .gradle
 build/
+
+### Claude Code (로컬 설정만 제외 — commands/skills는 체크인해서 clone하면 바로 쓴다) ###
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/

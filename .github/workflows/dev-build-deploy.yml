@@ -1,0 +1,37 @@
+# v4 12절: dev = push 자동 (현행 유지)
+# 샌드박스용 더미 — 실제 배포 없이 build + 태그 출력만 한다.
+name: Dev build & Deploy (dummy)
+
+on:
+  push:
+    branches:
+      - dev
+
+permissions:
+  contents: read
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'corretto'
+          cache: 'gradle'
+
+      - name: Build
+        run: ./gradlew build --no-daemon
+
+      - name: Deploy (dummy)
+        run: |
+          VERSION=$(grep -oP 'CURRENT = "\K[^"]+' src/main/java/com/ti/Version.java)
+          echo "::notice title=DEV deploy::env=dev ref=${GITHUB_REF_NAME} image=ti-server:v${VERSION} / ti-server:sha-${GITHUB_SHA::7}"
+          echo "## 🟢 DEV 배포 (dummy)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 트리거: \`push\` (자동)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 소스 브랜치: \`${GITHUB_REF_NAME}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 이미지 태그: \`ti-server:v${VERSION}\` / \`ti-server:sha-${GITHUB_SHA::7}\`" >> "$GITHUB_STEP_SUMMARY"

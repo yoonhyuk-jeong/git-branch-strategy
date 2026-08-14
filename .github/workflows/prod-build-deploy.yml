@@ -1,0 +1,77 @@
+# v4 12절: prod = pull_request closed(merged) 자동 + concurrency group
+#   master에는 dispatch를 붙이지 않는다 — UAT가 진짜 게이트이고, 검증한 소스가 그대로 prod로 간다.
+#   PR 1건 = 배포 1회. 그래서 묶음 배포는 조립 PR 1건이 기본 (feature별 PR을 따로 merge하면 배포가 N회 돈다).
+# 샌드박스용 더미 — 실제 배포 없이 build + 태그 출력만 한다.
+name: Prod build & Deploy (dummy)
+
+on:
+  pull_request:
+    branches:
+      - 'master'
+    types: [closed]
+
+permissions:
+  contents: read
+
+# v4 12절 필수: 연속 merge 시 Blue-Green 중첩 방지 (이전 인스턴스 미종료 이슈와 직결).
+# cancel-in-progress: false — 앞선 배포를 죽이지 않고 줄을 세운다.
+concurrency:
+  group: prod-deploy
+  cancel-in-progress: false
+
+jobs:
+  build-deploy:
+    # merge 없이 그냥 닫힌 PR은 배포하지 않는다
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      # v4 금지 규칙 8 증적: master tip이 정말 merge commit인지 부모 수로 검증한다.
+      # 부모가 1개면 Squash/Rebase merge 또는 FF — same-SHA 원칙이 깨진 상태다.
+      - name: Guard — Merge Commit 여부 검증
+        run: |
+          PARENTS=$(git rev-list --parents -n 1 HEAD | wc -w)
+          if [ "$PARENTS" -ge 3 ]; then
+            echo "✅ merge commit (부모 $((PARENTS - 1))개) — same-SHA 유지"
+          else
+            echo "::warning title=Squash 의심::master tip의 부모가 1개입니다. Squash/Rebase merge 또는 FF로 보입니다 (v4 금지 규칙 8). GitHub 설정에서 Squash/Rebase merge 비활성 여부를 확인하세요."
+          fi
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'corretto'
+          cache: 'gradle'
+
+      - name: Build
+        run: ./gradlew build --no-daemon
+
+      - name: Deploy (dummy)
+        run: |
+          VERSION=$(grep -oP 'CURRENT = "\K[^"]+' src/main/java/com/ti/Version.java)
+          SHA=$(git rev-parse HEAD)
+          echo "::notice title=PROD deploy::env=prod pr=#${{ github.event.pull_request.number }} image=ti-server:v${VERSION} / ti-server:sha-${SHA::7}"
+          {
+            echo "## 🔴 PROD 배포 (dummy)"
+            echo "- 트리거: PR #${{ github.event.pull_request.number }} merged (자동, dispatch 없음)"
+            echo "- PR 제목: ${{ github.event.pull_request.title }}"
+            echo "- master tip 부모 수: $(( $(git rev-list --parents -n 1 HEAD | wc -w) - 1 ))개 (2개 이상 = merge commit)"
+            echo "- 이미지 태그: \`ti-server:v${VERSION}\` / \`ti-server:sha-${SHA::7}\`"
+            echo ""
+            echo "### 이번 배포로 master에 들어온 것"
+            echo '```'
+            git log --oneline -10 "${SHA}"
+            echo '```'
+            echo ""
+            echo "### 열려 있는 release 브랜치 (사후 forward merge 대상)"
+            echo '```'
+            git branch -r --list 'origin/release-*' || echo "(없음)"
+            echo '```'
+            echo "> 배포 후: master를 열린 test / release / dev 에 forward merge → 끝난 release 삭제 → 반영된 feature 삭제 (v4 5단계)"
+          } >> "$GITHUB_STEP_SUMMARY"
