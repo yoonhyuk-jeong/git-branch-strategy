@@ -13,29 +13,26 @@ git fetch origin --prune --quiet
 
 ## 2. 칸반 보드 계산
 
-`git merge-base --is-ancestor <feature> <target>` 이 참이면 그 feature는 target에 merge된 것이다.
+`git branch -r --contains <feature>` 로 그 feature가 merge된 목적지를 뽑는다.
+
+> **셸 주의:** 이 레포 기본 셸은 zsh다. zsh는 `for t in $VAR` 에서 **단어 분리를 하지 않아** 리스트가
+> 한 덩어리로 들어온다. 그래서 리스트 순회는 반드시 파이프 + `while IFS= read -r` 로 쓴다.
 
 ```bash
-MASTER=origin/master
-TARGETS=$(git for-each-ref --format='%(refname:short)' refs/remotes/origin \
-          | grep -E '^origin/(dev|test|release-)' | sort)
-FEATURES=$(git for-each-ref --format='%(refname:short)' refs/remotes/origin \
-           | grep -E '^origin/([0-9]{4}/|hotfix/|epic/|feat/)' | sort)
-
-printf '%-45s' "feature"; for t in $TARGETS; do printf '%-16s' "${t#origin/}"; done; printf '%-10s\n' "master"
-for f in $FEATURES; do
-  printf '%-45s' "${f#origin/}"
-  for t in $TARGETS; do
-    git merge-base --is-ancestor "$f" "$t" 2>/dev/null && printf '%-16s' "O" || printf '%-16s' "-"
-  done
-  git merge-base --is-ancestor "$f" "$MASTER" 2>/dev/null && printf '%-10s' "O" || printf '%-10s' "-"
-  # master 대비 뒤처짐 = 최신화 필요 (v4 8절)
-  git merge-base --is-ancestor "$MASTER" "$f" 2>/dev/null || printf '  ⚠ master 뒤처짐'
-  echo
-done
+git for-each-ref --format='%(refname:short)' refs/remotes/origin \
+  | grep -E '^origin/([0-9]{4}/|hotfix/|epic/|feat/)' | sort \
+  | while IFS= read -r f; do
+      merged=$(git branch -r --contains "$f" 2>/dev/null | sed 's/^[* ] *//' \
+               | grep -E '^origin/(dev|test|master|release-)' | sed 's|^origin/||' | tr '\n' ' ')
+      stale=""
+      # master 대비 뒤처짐 = 최신화 필요 (v4 8절)
+      git merge-base --is-ancestor origin/master "$f" 2>/dev/null || stale="  ⚠ master 뒤처짐"
+      printf '%s\t%s%s\n' "${f#origin/}" "${merged:-(없음)}" "$stale"
+    done
 ```
 
-이 결과를 v4 2절 형식의 표로 정리하고, 각 행에 **단계 해석**을 붙여 보여준다:
+출력은 `feature<TAB>merge된 목적지들` 형태다. 이걸 **v4 2절 형식의 칸반 표로 렌더링**해서 보여준다
+(열 = dev / test / 열려 있는 release-* / master, 값 = ✓ 또는 —). 각 행에 **단계 해석**을 붙인다:
 
 | 패턴 | 해석 | 다음 액션 |
 | --- | --- | --- |
@@ -50,12 +47,16 @@ done
 
 ```bash
 echo "── UAT 후보 (열린 release마다) ──"
-for r in $(git for-each-ref --format='%(refname:short)' refs/remotes/origin | grep '^origin/release-'); do
-  echo "[$r]"; git log "$r" --not origin/master --merges --oneline
-done
+git for-each-ref --format='%(refname:short)' refs/remotes/origin | grep '^origin/release-' \
+  | while IFS= read -r r; do
+      echo "[$r]"; git log "$r" --not origin/master --merges --oneline
+    done
 echo "── test 단계 이상 전부 (대기분 포함) ──"
 git log origin/test --not origin/master --merges --oneline
 ```
+
+> `git log`는 결과가 비어도 exit 0이므로 `|| echo "없음"` 이 안 먹는다. 비었는지 판단은
+> `[ -z "$(git log ... )" ]` 로 하거나 출력이 없으면 "없음"으로 읽는다.
 
 - **열린 release가 2개 이상이면 알린다** — UAT는 단일 환경이라 dispatch 순서를 통제해야 한다.
 - 실제로 어느 환경에 무엇이 떠 있는지는 git이 모른다 (dispatch 시점의 문제). 필요하면 확인:

@@ -30,6 +30,12 @@ java -cp build/classes/java/main com.ti.Main
 
 주의: 이 레포는 Windows에서 만들어져 `gradlew`가 CRLF였다. LF로 정규화해 뒀으니 되돌리지 말 것.
 
+## 셸 주의 (zsh)
+
+기본 셸이 zsh다. **zsh는 `for x in $VAR` 에서 단어 분리를 하지 않는다** — 브랜치 목록을 변수에 담아
+순회하면 한 덩어리로 들어와서 조용히 틀린 결과가 나온다. 리스트 순회는 파이프 + `while IFS= read -r` 로 쓴다.
+(`$(...)` 명령 치환은 zsh에서도 분리되므로 그건 괜찮다.)
+
 ## 코드 구조 (충돌 실험용으로 의도된 것)
 
 - `FeatureRegistry.register()` — **의도된 충돌 지점.** 모든 feature가 여기에 한 줄 추가 → 동시 진행 시 반드시 충돌 (rerere 검증용)
