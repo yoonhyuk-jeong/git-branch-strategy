@@ -6,8 +6,9 @@ description: IMT Git Branch v4 배포 플로우 — feature 브랜치 생성/QA(
 
 이 레포의 브랜치/배포 규칙은 **v4**를 따른다. 브랜치 생성, merge, PR, 배포, 충돌 처리 관련 작업을 할 때 아래 규칙을 지키고, 반복 절차는 전용 커맨드(`/imt-*`)를 안내한다.
 
-> **규칙 원본(단일 진실):** [`claude-help/workflow/GIT_BRANCH_STRATEGY_V4_DRAFT.md`](../../claude-help/workflow/GIT_BRANCH_STRATEGY_V4_DRAFT.md)
+> **규칙 원본(단일 진실):** [Confluence — IMT Git Branch 전략 v4](https://trialinformatics.atlassian.net/wiki/spaces/ImageTrial/pages/716800002) (확정 2026-08-14)
 > 여기 요약과 원본이 충돌하면 원본이 우선. 세부/시나리오는 원본을 읽어라.
+> **로컬 사본을 만들지 않는다** — 문서는 Confluence 한 곳만 유지한다(사본이 드리프트의 원인).
 
 ## 핵심 원칙
 
@@ -57,10 +58,10 @@ featC     ✓     —         —            —      개발/연동 중
 
 1. 타겟별 사본 브랜치(`-dev`/`-test`/`-master`/`-release`) 생성 금지.
 2. feature에 dev/test/release를 merge 금지(역방향 오염). **당겨오는 건 `git merge master`만.**
-3. `test` / `release`를 **어디로든 merge 금지** — 둘 다 목적지 전용. master는 **항상 feature 단위**로만 받는다(통째/FF 포함 금지).
+3. `test` / `release`를 **어디로든 merge 금지** — 둘 다 목적지 전용. master가 받는 건 **feature 단위 merge 또는 그걸 모은 조립 브랜치**(`assemble/{월일}`)뿐이다. release를 master에 붓는 것은 FF 포함 금지.
 4. dev/test/release에서 feature 분기 금지 — **항상 master**.
 5. 이미 공유된 브랜치 rebase 금지 — `git merge master`로 대신.
-6. dev/test에 직접 커밋 금지 — 모든 코드는 feature 경유.
+6. dev / test / **release-{날짜}**에 직접 커밋 금지 — 모든 코드는 feature 경유. release 직접 커밋은 통째 merge 시 미검증 코드가 조용히 prod로 들어간다.
 7. master에 UAT 미통과분 merge 금지.
 8. **모든 merge는 Merge Commit — Squash/Rebase merge 금지.**
 
@@ -69,6 +70,7 @@ featC     ✓     —         —            —      개발/연동 중
 ```
 feature : {날짜}/{이니셜}/{JIRA}-{기능명}   예) 0812/YH/IMTDEV-1980-user-filtering
 release : release-{월일}                     예) release-0812   (재조립: release-0812-v2)
+assemble: assemble/{월일}                    예) assemble/0812  (묶음 배포 시에만, 배포 후 삭제)
 hotfix  : hotfix/{짧은설명}
 ```
 - 날짜 = 목표 배포일(MMDD). date-first라 `git branch --list "0812/*"`로 배포 후보가 묶인다.

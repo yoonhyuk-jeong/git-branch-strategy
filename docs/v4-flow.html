@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IMT Git Branch 전략 v4 — 시각 설명</title>
+<style>
+  /* ── 팔레트: dataviz 검증 통과 (all-pairs, light+dark) ─────────────────────
+     색은 "기능(entity)"에 붙는다. 같은 SHA가 여러 목적지에 나타나는 것이
+     v4의 핵심이므로, 목적지/환경은 중립 크롬으로 두고 hue는 feature가 가진다.
+       featA = slot1 blue / featB = slot2 orange / featC = slot3 aqua
+     worst all-pairs CVD ΔE 9.2 light / 9.4 dark · normal 24.0 / 20.9
+     light aqua는 대비 2.74로 3:1 미달 → 항상 텍스트 라벨 동반(relief rule)   */
+  :root {
+    color-scheme: light;
+    --surface-1:#fcfcfb; --plane:#f9f9f7; --surface-2:#f2f1ed;
+    --ink-1:#0b0b0b; --ink-2:#52514e; --ink-3:#898781;
+    --grid:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,.10);
+    --featA:#2a78d6; --featB:#eb6834; --featC:#1baf7a;
+    --good:#0ca30c; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b;
+    --good-text:#006300;
+    --shadow:0 1px 2px rgba(11,11,11,.05), 0 8px 24px -12px rgba(11,11,11,.14);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-1:#1a1a19; --plane:#0d0d0d; --surface-2:#222221;
+      --ink-1:#ffffff; --ink-2:#c3c2b7; --ink-3:#898781;
+      --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+      --featA:#3987e5; --featB:#d95926; --featC:#199e70;
+      --good-text:#0ca30c;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1:#1a1a19; --plane:#0d0d0d; --surface-2:#222221;
+    --ink-1:#ffffff; --ink-2:#c3c2b7; --ink-3:#898781;
+    --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+    --featA:#3987e5; --featB:#d95926; --featC:#199e70;
+    --good-text:#0ca30c;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+
+  * { box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  body {
+    margin:0; background:var(--plane); color:var(--ink-1);
+    font:15px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  code, .sha, .mono { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-variant-numeric:tabular-nums; }
+  h1,h2,h3 { line-height:1.25; margin:0; letter-spacing:-.011em; }
+  h2 { font-size:19px; }
+  h3 { font-size:15px; }
+  p { margin:0; }
+  a { color:inherit; }
+
+  .wrap { max-width:1120px; margin:0 auto; padding:0 20px 80px; }
+
+  /* ── header ── */
+  header {
+    position:sticky; top:0; z-index:20; background:color-mix(in srgb, var(--plane) 88%, transparent);
+    backdrop-filter:blur(12px); border-bottom:1px solid var(--ring);
+  }
+  .hrow { max-width:1120px; margin:0 auto; padding:14px 20px; display:flex; align-items:center; gap:14px; }
+  .hrow h1 { font-size:16px; font-weight:650; }
+  .hrow .v { font-size:11px; font-weight:650; letter-spacing:.06em; padding:3px 7px; border-radius:5px;
+             background:var(--surface-2); border:1px solid var(--ring); color:var(--ink-2); }
+  .spacer { flex:1; }
+  .btn {
+    font:inherit; font-size:13px; color:var(--ink-1); background:var(--surface-1);
+    border:1px solid var(--ring); border-radius:8px; padding:6px 11px; cursor:pointer;
+  }
+  .btn:hover { background:var(--surface-2); }
+  .btn:disabled { opacity:.38; cursor:not-allowed; }
+  .btn.primary { background:var(--ink-1); color:var(--surface-1); border-color:var(--ink-1); }
+
+  /* ── hero ── */
+  .hero { padding:44px 0 30px; }
+  .hero h2 { font-size:clamp(24px,3.4vw,36px); font-weight:680; letter-spacing:-.02em; }
+  .hero .lede { margin-top:14px; max-width:70ch; color:var(--ink-2); font-size:16px; }
+  .axiom {
+    margin-top:26px; padding:18px 20px; border-radius:12px; background:var(--surface-1);
+    border:1px solid var(--ring); border-left:3px solid var(--ink-1); box-shadow:var(--shadow);
+  }
+  .axiom b { font-weight:650; }
+  .axiom .sub { margin-top:8px; color:var(--ink-2); font-size:14px; }
+
+  /* ── section ── */
+  section { margin-top:52px; }
+  .shead { display:flex; align-items:baseline; gap:12px; margin-bottom:6px; }
+  .shead .n { font-size:12px; font-weight:650; color:var(--ink-3); font-variant-numeric:tabular-nums; }
+  .sdesc { color:var(--ink-2); font-size:14px; margin-bottom:18px; max-width:76ch; }
+
+  .card { background:var(--surface-1); border:1px solid var(--ring); border-radius:12px; box-shadow:var(--shadow); }
+
+  /* ── player ── */
+  .player { display:grid; grid-template-columns:255px 1fr; gap:0; overflow:hidden; }
+  @media (max-width:900px){ .player { grid-template-columns:1fr; } }
+  .steps { border-right:1px solid var(--ring); padding:10px; background:var(--surface-2); }
+  @media (max-width:900px){ .steps { border-right:0; border-bottom:1px solid var(--ring); } }
+  .steps ol { list-style:none; margin:0; padding:0; }
+  .steps li { margin:0; }
+  .steps button {
+    width:100%; text-align:left; font:inherit; font-size:13px; line-height:1.4; color:var(--ink-2);
+    background:none; border:0; border-radius:7px; padding:7px 9px; cursor:pointer;
+    display:flex; gap:9px; align-items:flex-start;
+  }
+  .steps button:hover { background:var(--surface-1); color:var(--ink-1); }
+  .steps button[aria-current="true"] { background:var(--surface-1); color:var(--ink-1); font-weight:600; box-shadow:var(--shadow); }
+  .steps .idx { font-size:11px; font-variant-numeric:tabular-nums; color:var(--ink-3); padding-top:2px; min-width:14px; }
+  .steps button[aria-current="true"] .idx { color:var(--ink-1); }
+
+  .stage { padding:18px 20px 20px; min-width:0; }
+  .graphbox { overflow-x:auto; margin:0 -4px; }
+  svg.graph { display:block; min-width:748px; }
+  .glabel { font:11px/1 ui-monospace,SFMono-Regular,Menlo,monospace; fill:var(--ink-2); }
+  .glabel.dim { fill:var(--ink-3); }
+  .gsha  { font:9.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace; fill:var(--ink-3); font-variant-numeric:tabular-nums; }
+  .lane  { stroke:var(--grid); stroke-width:1; }
+  .lane.active { stroke:var(--axis); }
+  .edge  { fill:none; stroke-width:2; }
+  .node  { stroke:var(--surface-1); stroke-width:2; }
+  .fade  { opacity:.42; }   /* 과거 단계 — 물러나지만 읽히는 정도 (라이트 모드에서 .26은 너무 흐리다) */
+  .gone  { opacity:.16; }
+  /* SVG는 transform-origin 기본값이 0 0 이라 fill-box로 바꿔야 제자리에서 커진다 */
+  .pulse { animation:pop .45s cubic-bezier(.2,.8,.3,1); transform-box:fill-box; transform-origin:center; }
+  @keyframes pop { from { transform:scale(.4); opacity:0; } to { transform:scale(1); opacity:1; } }
+
+  /* minmax(0,…) — 트랙이 콘텐츠 min-content 때문에 자기 몫을 넘지 않게 */
+  .below { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); gap:16px; margin-top:16px; }
+  @media (max-width:820px){ .below { grid-template-columns:1fr; } }
+  .panel { border:1px solid var(--ring); border-radius:10px; padding:13px 14px; background:var(--surface-1); }
+  .panel > h3 { font-size:11px; font-weight:650; letter-spacing:.07em; text-transform:uppercase; color:var(--ink-3); margin-bottom:10px; }
+
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  th, td { text-align:left; padding:6px 7px; border-bottom:1px solid var(--grid); }
+  #kanban th.c, #kanban td.c { padding-left:3px; padding-right:3px; }
+  #kanban td:last-child, #kanban th:last-child { padding-left:11px; }
+  th { font-size:11px; font-weight:650; color:var(--ink-3); letter-spacing:.03em; }
+  tr:last-child td { border-bottom:0; }
+  td.c, th.c { text-align:center; }
+  .yes { color:var(--good-text); font-weight:700; }
+  .no  { color:var(--ink-3); }
+  .fname { display:flex; align-items:center; gap:7px; white-space:nowrap; }
+  .dot { width:9px; height:9px; border-radius:50%; flex:none; }
+  /* nowrap이면 이 칸의 min-content가 트랙 몫을 넘겨 옆 패널을 밀어낸다 */
+  .stat { font-size:12px; color:var(--ink-2); }
+
+  .envgrid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+  .env { border:1px solid var(--ring); border-radius:9px; padding:9px 10px; background:var(--surface-2); }
+  .env .top { display:flex; align-items:center; gap:6px; }
+  .env .nm { font-size:12px; font-weight:650; letter-spacing:.04em; text-transform:uppercase; }
+  .env .trig { font-size:10px; color:var(--ink-3); margin-left:auto; white-space:nowrap; }
+  .env .body { margin-top:7px; font-size:11px; min-height:32px; display:flex; flex-wrap:wrap; gap:4px; align-items:flex-start; }
+  .chip {
+    display:inline-flex; align-items:center; gap:5px; font-size:10.5px; padding:2.5px 6px; border-radius:5px;
+    background:var(--surface-1); border:1px solid var(--ring); white-space:nowrap;
+  }
+  .chip .sha { font-size:10px; color:var(--ink-2); }
+  .empty { color:var(--ink-3); font-size:11px; }
+
+  .narr { margin-top:16px; border:1px solid var(--ring); border-radius:10px; overflow:hidden; }
+  .narr .t { padding:12px 14px; background:var(--surface-2); border-bottom:1px solid var(--ring); }
+  .narr .t strong { font-size:14px; }
+  .narr .t p { margin-top:5px; color:var(--ink-2); font-size:13.5px; }
+  .narr .cmd { padding:11px 14px; font-size:12.5px; overflow-x:auto; white-space:pre; color:var(--ink-1); }
+  .narr .why { padding:0 14px 12px; font-size:12.5px; color:var(--ink-2); }
+  .narr .why b { color:var(--ink-1); }
+  .flag {
+    display:inline-flex; align-items:center; gap:6px; font-size:11.5px; font-weight:600;
+    padding:3px 8px; border-radius:6px; border:1px solid var(--ring); background:var(--surface-2);
+    white-space:nowrap;
+  }
+  .flag.wait  { color:var(--ink-1); } .flag.wait  .i { color:var(--warning); }
+  .flag.ship  { color:var(--ink-1); } .flag.ship  .i { color:var(--good); }
+  .flag.stop  { color:var(--ink-1); } .flag.stop  .i { color:var(--critical); }
+
+  /* ── generic grids ── */
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(232px,1fr)); gap:14px; }
+  .dcard { padding:15px 16px; border-radius:11px; background:var(--surface-1); border:1px solid var(--ring); box-shadow:var(--shadow); }
+  .dcard .nm { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13px; font-weight:650; }
+  .dcard .role { margin-top:3px; font-size:12px; color:var(--ink-3); }
+  .dcard dl { margin:11px 0 0; display:grid; grid-template-columns:auto 1fr; gap:5px 10px; font-size:12.5px; }
+  .dcard dt { color:var(--ink-3); white-space:nowrap; }
+  .dcard dd { margin:0; color:var(--ink-2); }
+  .dcard dd b { color:var(--ink-1); font-weight:600; }
+
+  .rules { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:10px; }
+  .rule { display:flex; gap:10px; padding:11px 13px; border-radius:9px; background:var(--surface-1); border:1px solid var(--ring); font-size:13px; }
+  .rule .i { color:var(--critical); font-weight:700; flex:none; }
+  .rule b { font-weight:650; }
+  .rule .sub { color:var(--ink-2); font-size:12px; margin-top:3px; }
+
+  .compare { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media (max-width:760px){ .compare { grid-template-columns:1fr; } }
+  .cmp { padding:15px; border-radius:11px; border:1px solid var(--ring); background:var(--surface-1); }
+  .cmp h3 { display:flex; align-items:center; gap:7px; font-size:13px; }
+  .cmp .verdict { font-size:12px; color:var(--ink-2); margin-top:9px; }
+  .cmp svg { display:block; width:100%; height:auto; margin-top:10px; }
+
+  /* ── 커맨드 레퍼런스 ── */
+  .cmdhead { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+  .cmdhead .nm { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:17px; font-weight:650; }
+  .cmdhead .tag { font-size:12.5px; color:var(--ink-2); }
+  .callsig {
+    margin-top:12px; padding:10px 12px; border-radius:8px; background:var(--surface-2);
+    border:1px solid var(--ring); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:12.5px; overflow-x:auto; white-space:pre;
+  }
+  .callsig .arg { color:var(--ink-3); }
+  .cmdgrid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px; margin-top:14px; }
+  @media (max-width:780px){ .cmdgrid { grid-template-columns:1fr; } }
+  .cmdgrid h4, .cmdsec h4 {
+    margin:0 0 8px; font-size:11px; font-weight:650; letter-spacing:.07em;
+    text-transform:uppercase; color:var(--ink-3);
+  }
+  .cmdsec { margin-top:14px; }
+  ol.proc { margin:0; padding-left:19px; font-size:13px; color:var(--ink-2); }
+  ol.proc li { margin-bottom:5px; }
+  ol.proc li b, ul.plain li b { color:var(--ink-1); font-weight:600; }
+  ul.plain { list-style:none; margin:0; padding:0; font-size:13px; color:var(--ink-2); }
+  ul.plain li { display:flex; gap:8px; margin-bottom:6px; }
+  ul.plain .i { flex:none; font-weight:700; }
+  ul.plain li.gate .i { color:var(--warning); }
+  ul.plain li.guard .i { color:var(--critical); }
+  pre.term {
+    margin:0; padding:12px 13px; border-radius:8px; background:var(--plane);
+    border:1px solid var(--ring); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:11.5px; line-height:1.55; overflow-x:auto; color:var(--ink-2);
+  }
+  pre.term b { color:var(--ink-1); font-weight:650; }
+  pre.term .ok { color:var(--good-text); }
+  pre.term .warn { color:var(--warning); }
+  pre.term .you { color:var(--ink-1); font-weight:650; }
+  .nextup { margin-top:14px; font-size:13px; color:var(--ink-2); }
+  .nextup b { color:var(--ink-1); }
+
+  .legend { display:flex; flex-wrap:wrap; gap:14px; align-items:center; font-size:12px; color:var(--ink-2); margin-bottom:12px; }
+  .legend .item { display:inline-flex; align-items:center; gap:6px; }
+  .foot { margin-top:56px; padding-top:20px; border-top:1px solid var(--ring); font-size:12.5px; color:var(--ink-3); }
+  .foot a { text-decoration:underline; text-underline-offset:2px; }
+  .kbd { font-size:11px; padding:1.5px 5px; border:1px solid var(--ring); border-bottom-width:2px; border-radius:4px; background:var(--surface-2); color:var(--ink-2); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hrow">
+    <h1>IMT Git Branch 전략</h1>
+    <span class="v">v4</span>
+    <span class="v" style="color:var(--good-text)">확정 · 2026-08-14</span>
+    <span class="spacer"></span>
+    <button class="btn" id="theme">◐ 테마</button>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="hero">
+    <h2>브랜치는 승격 파이프라인이 아니다.<br>4개의 독립 목적지다.</h2>
+    <p class="lede">
+      v3까지는 기능이 dev → test → uat → prod 로 <em>올라간다</em>고 생각했다. 그래서 목적지마다 사본 브랜치를 만들고,
+      같은 기능이 환경마다 다른 SHA를 갖게 됐다. v4는 방향을 뒤집는다 —
+      브랜치 하나를 만들고, <b>보내고 싶은 곳에 그 브랜치를 merge한다.</b>
+    </p>
+    <div class="axiom">
+      <b>하나의 기능 = 하나의 브랜치 = 동일한 커밋(SHA)이 dev / test / release / master 에 각각 독립 merge된다.</b>
+      <div class="sub">어디까지 merge했나 = 그 기능의 현재 단계. 그래서 브랜치 목록이 곧 칸반 보드가 된다.</div>
+    </div>
+  </div>
+
+  <!-- ════════ 1. 시나리오 플레이어 ════════ -->
+  <section>
+    <div class="shead"><span class="n">01</span><h2>시나리오 2 — 대기와 추월</h2></div>
+    <p class="sdesc">
+      v4에서 가장 흔한 패턴이자, v3에서 표현할 수 없었던 상황이다. featA는 QA를 통과했지만 배포일이 미정이고,
+      featB는 배포가 확정됐다. <b>featA가 test에서 기다리는 동안 featB가 먼저 나간다.</b>
+      단계를 눌러 보거나 <span class="kbd">←</span> <span class="kbd">→</span> 로 넘겨라.
+    </p>
+
+    <div class="legend">
+      <span class="item"><span class="dot" style="background:var(--featA)"></span> featA <span class="mono" style="color:var(--ink-3)">0814/YH/IMTDEV-1001-filter</span></span>
+      <span class="item"><span class="dot" style="background:var(--featB)"></span> featB <span class="mono" style="color:var(--ink-3)">0814/YH/IMTDEV-1002-export</span></span>
+      <span class="item"><span class="dot" style="background:var(--ink-2)"></span> master 기준선</span>
+    </div>
+
+    <div class="card player">
+      <nav class="steps"><ol id="steplist"></ol></nav>
+      <div class="stage">
+        <div class="graphbox">
+          <svg class="graph" id="graph" viewBox="0 0 748 400" role="img"
+               aria-label="featA와 featB가 dev, test, release-0814, master에 각각 merge되는 커밋 그래프"></svg>
+        </div>
+
+        <div class="below">
+          <div class="panel">
+            <h3>칸반 — 어디까지 merge했나</h3>
+            <table id="kanban">
+              <thead><tr>
+                <th>기능</th><th class="c">dev</th><th class="c">test</th>
+                <th class="c">release</th><th class="c">master</th><th>상태</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="panel">
+            <h3>환경에 떠 있는 것</h3>
+            <div class="envgrid" id="envs"></div>
+          </div>
+        </div>
+
+        <div class="narr">
+          <div class="t">
+            <strong id="n-title"></strong>
+            <p id="n-body"></p>
+          </div>
+          <div class="cmd mono" id="n-cmd"></div>
+          <div class="why" id="n-why"></div>
+        </div>
+
+        <div style="display:flex; gap:8px; margin-top:14px; align-items:center;">
+          <button class="btn" id="prev">← 이전</button>
+          <button class="btn primary" id="next">다음 →</button>
+          <span class="spacer"></span>
+          <span class="stat" id="counter"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════ 2. 같은 SHA ════════ -->
+  <section>
+    <div class="shead"><span class="n">02</span><h2>v3에서 무엇이 틀렸나</h2></div>
+    <p class="sdesc">
+      두 그림의 차이는 브랜치 개수가 아니라 <b>SHA가 몇 개인가</b>다. 왼쪽은 목적지마다 사본을 만들어
+      "같은 기능"이 서로 다른 커밋 4개가 된 상태다 — UAT에서 검증한 것이 prod에 나간 것과 다르다.
+    </p>
+    <div class="compare">
+      <div class="cmp">
+        <h3><span style="color:var(--critical)">✕</span> 사본 브랜치 (금지)</h3>
+        <svg viewBox="0 0 380 150" aria-label="사본 브랜치를 만들면 SHA가 4개로 갈라진다">
+          <g class="glabel">
+            <text x="0" y="20">feat-dev</text><text x="0" y="52">feat-test</text>
+            <text x="0" y="84">feat-uat</text><text x="0" y="116">feat-master</text>
+          </g>
+          <g>
+            <circle cx="150" cy="15" r="6" fill="var(--featB)" class="node"/><text class="gsha" x="164" y="19">7a1f09c</text>
+            <circle cx="150" cy="47" r="6" fill="var(--featB)" class="node"/><text class="gsha" x="164" y="51">c48d2b1</text>
+            <circle cx="150" cy="79" r="6" fill="var(--featB)" class="node"/><text class="gsha" x="164" y="83">e91b47a</text>
+            <circle cx="150" cy="111" r="6" fill="var(--featB)" class="node"/><text class="gsha" x="164" y="115">2f60dd8</text>
+          </g>
+          <text class="gsha" x="150" y="140" fill="var(--critical)">SHA 4개 — 검증한 것 ≠ 배포된 것</text>
+        </svg>
+        <p class="verdict">cherry-pick·재작성으로 트리가 미묘하게 갈라진다. "UAT에서 통과했다"는 증적이 성립하지 않는다.</p>
+      </div>
+      <div class="cmp">
+        <h3><span style="color:var(--good)">✓</span> same-SHA (v4)</h3>
+        <svg viewBox="0 0 380 150" aria-label="하나의 SHA가 네 목적지에 각각 merge된다">
+          <g class="glabel">
+            <text x="0" y="20">dev</text><text x="0" y="52">test</text>
+            <text x="0" y="84">release-0814</text><text x="0" y="116">master</text>
+          </g>
+          <g class="edge" stroke="var(--featB)">
+            <path d="M150 66 C 210 66, 230 15, 290 15"/>
+            <path d="M150 66 C 210 66, 230 47, 290 47"/>
+            <path d="M150 66 C 210 66, 230 79, 290 79"/>
+            <path d="M150 66 C 210 66, 230 111, 290 111"/>
+          </g>
+          <circle cx="150" cy="66" r="7" fill="var(--featB)" class="node"/>
+          <text class="gsha" x="112" y="88" text-anchor="middle">c3d4e5f</text>
+          <g>
+            <circle cx="290" cy="15" r="6" fill="var(--featB)" class="node"/>
+            <circle cx="290" cy="47" r="6" fill="var(--featB)" class="node"/>
+            <circle cx="290" cy="79" r="6" fill="var(--featB)" class="node"/>
+            <circle cx="290" cy="111" r="6" fill="var(--featB)" class="node"/>
+          </g>
+          <text class="gsha" x="150" y="140" fill="var(--good-text)">SHA 1개 — 검증한 것 = 배포된 것</text>
+        </svg>
+        <p class="verdict">브랜치 1개를 네 곳에 merge한다. 커밋은 하나뿐이므로 UAT 증적이 prod에 그대로 유효하다.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════ 3. 목적지 4개 ════════ -->
+  <section>
+    <div class="shead"><span class="n">03</span><h2>목적지 4개의 성격</h2></div>
+    <p class="sdesc">승격 단계가 아니라 각각 다른 질문에 답하는 독립 목적지다. 수명과 트리거가 전부 다르다.</p>
+    <div class="cards">
+      <div class="dcard">
+        <div class="nm">dev</div><div class="role">연동 놀이터 · 게이트 아님</div>
+        <dl>
+          <dt>질문</dt><dd>FE/BE가 붙나?</dd>
+          <dt>트리거</dt><dd><b>push 자동</b></dd>
+          <dt>merge</dt><dd><b>선택</b> (연동 필요할 때만)</dd>
+          <dt>리뷰</dt><dd>생략 가능 (fast-lane)</dd>
+          <dt>수명</dt><dd>휘발 — 정기 리셋</dd>
+        </dl>
+      </div>
+      <div class="dcard">
+        <div class="nm">test</div><div class="role">QA 게이트 + <b>배포 대기실</b></div>
+        <dl>
+          <dt>질문</dt><dd>이 기능 QA 통과했나?</dd>
+          <dt>트리거</dt><dd><b>dispatch</b> (QA가 시점 통제)</dd>
+          <dt>merge</dt><dd>의무</dd>
+          <dt>리뷰</dt><dd><b>본 리뷰 1회는 여기서</b></dd>
+          <dt>수명</dt><dd>휘발 — 리셋 + 대기분 재구성</dd>
+        </dl>
+      </div>
+      <div class="dcard">
+        <div class="nm">release-{날짜}</div><div class="role">UAT 조립대 · 사이클 1회용</div>
+        <dl>
+          <dt>질문</dt><dd>이 <b>조합</b>이 prod에서 도나?</dd>
+          <dt>트리거</dt><dd><b>dispatch</b> (다중 release 대비)</dd>
+          <dt>merge</dt><dd>배포 확정분만</dd>
+          <dt>리뷰</dt><dd>확인 수준</dd>
+          <dt>수명</dt><dd>생성 → 배포 → <b>삭제</b></dd>
+        </dl>
+      </div>
+      <div class="dcard">
+        <div class="nm">master</div><div class="role">Mainline · prod 진실</div>
+        <dl>
+          <dt>질문</dt><dd>지금 prod에 뭐가 돌고 있나?</dd>
+          <dt>트리거</dt><dd><b>PR merge 자동</b> (dispatch 없음)</dd>
+          <dt>merge</dt><dd>UAT 통과분만, feature 단위로</dd>
+          <dt>리뷰</dt><dd>확인 수준</dd>
+          <dt>수명</dt><dd><b>영구</b> — 모든 분기의 시작점</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════ 4. 배포 횟수 ════════ -->
+  <section>
+    <div class="shead"><span class="n">04</span><h2>왜 조립 PR 1건인가</h2></div>
+    <p class="sdesc">
+      prod 트리거가 <code>pull_request closed(merged)</code> 이라서 <b>PR 1건 = 배포 1회</b>다.
+      이 사실 하나가 묶음 배포 방식을 결정한다 — v3의 "묶음 push 1회 = 배포 1회"는 이 트리거에서 아예 동작하지 않는다.
+    </p>
+    <div class="compare">
+      <div class="cmp">
+        <h3><span style="color:var(--critical)">✕</span> feature별 PR 2건</h3>
+        <svg viewBox="0 0 380 110" aria-label="PR 2건을 각각 merge하면 prod 배포가 2회 돈다">
+          <g class="edge" stroke="var(--featA)"><path d="M20 24 C 90 24, 110 55, 180 55"/></g>
+          <g class="edge" stroke="var(--featB)"><path d="M20 86 C 90 86, 110 55, 180 55"/></g>
+          <circle cx="20" cy="24" r="6" fill="var(--featA)" class="node"/>
+          <circle cx="20" cy="86" r="6" fill="var(--featB)" class="node"/>
+          <text class="glabel" x="34" y="16">PR #1</text><text class="glabel" x="34" y="106">PR #2</text>
+          <line x1="180" y1="55" x2="290" y2="55" stroke="var(--axis)" stroke-width="2"/>
+          <circle cx="215" cy="55" r="6" fill="var(--featA)" class="node"/>
+          <circle cx="255" cy="55" r="6" fill="var(--featB)" class="node"/>
+          <text class="glabel dim" x="290" y="40">master</text>
+          <text class="gsha" x="290" y="59" fill="var(--critical)">배포 2회 ⚡⚡</text>
+        </svg>
+        <p class="verdict">Blue-Green이 중첩된다. concurrency group이 줄은 세워주지만 <b>배포 횟수는 줄이지 않는다.</b></p>
+      </div>
+      <div class="cmp">
+        <h3><span style="color:var(--good)">✓</span> 조립 PR 1건</h3>
+        <svg viewBox="0 0 380 110" aria-label="조립 브랜치에 모아 PR 1건으로 merge하면 prod 배포가 1회 돈다">
+          <g class="edge" stroke="var(--featA)"><path d="M20 24 C 60 24, 70 45, 110 45"/></g>
+          <g class="edge" stroke="var(--featB)"><path d="M20 86 C 60 86, 70 45, 110 45"/></g>
+          <circle cx="20" cy="24" r="6" fill="var(--featA)" class="node"/>
+          <circle cx="20" cy="86" r="6" fill="var(--featB)" class="node"/>
+          <line x1="110" y1="45" x2="175" y2="45" stroke="var(--axis)" stroke-width="2"/>
+          <circle cx="125" cy="45" r="5.5" fill="var(--featA)" class="node"/>
+          <circle cx="150" cy="45" r="5.5" fill="var(--featB)" class="node"/>
+          <text class="glabel dim" x="110" y="32">assemble/0814</text>
+          <g class="edge" stroke="var(--ink-2)"><path d="M175 45 C 215 45, 220 62, 260 62"/></g>
+          <line x1="260" y1="62" x2="330" y2="62" stroke="var(--axis)" stroke-width="2"/>
+          <circle cx="288" cy="62" r="6.5" fill="var(--ink-2)" class="node"/>
+          <text class="glabel dim" x="260" y="50">master</text>
+          <text class="gsha" x="240" y="94" fill="var(--good-text)">PR 1건 → 배포 1회 ⚡</text>
+        </svg>
+        <p class="verdict"><code>assemble/{날짜}</code>에 feature merge들을 모아 master로 PR 1건. 트리는 동일하고 배포만 1회다.
+          내용이 <code>release-{날짜}</code>와 같아야 정상이며, <b>배포에서 기능을 뺄 때는 여기서 골라내지 않고</b>
+          <code>release-{날짜}-v2</code>로 재조립 + UAT 재검증한다.</p>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:14px">
+      <h3>환경별 트리거 (v4 12절 목표 상태)</h3>
+      <table>
+        <thead><tr><th>환경</th><th>트리거</th><th>소스</th><th>왜</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">dev</td><td>⚡ push 자동</td><td class="mono">dev</td><td>연동 확인은 빠를수록 좋다</td></tr>
+          <tr><td class="mono">test</td><td>▶ dispatch</td><td class="mono">test</td><td>QA가 검증 시작 시점을 통제 — 검증 중 다른 merge에 덮이지 않는다</td></tr>
+          <tr><td class="mono">uat</td><td>▶ dispatch</td><td class="mono">release-{날짜}</td><td>release가 동시에 여러 개 열린다. push 자동이면 검증 중인 UAT를 덮어쓴다</td></tr>
+          <tr><td class="mono">prod</td><td>⚡ PR merged 자동</td><td class="mono">master</td><td>UAT가 진짜 게이트다. 검증한 소스를 그대로 내보낸다 (+ concurrency group)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ════════ 5. 금지 규칙 ════════ -->
+  <section>
+    <div class="shead"><span class="n">05</span><h2>금지 규칙</h2></div>
+    <p class="sdesc">대부분 "역방향" 또는 "통째"를 막는 규칙이다. 둘 다 미배포 기능을 master로 끌고 들어오는 경로다.</p>
+    <div class="rules">
+      <div class="rule"><span class="i" aria-hidden="true">✕</span><div><b>타겟별 사본 브랜치</b><div class="sub"><code>-dev</code> <code>-test</code> <code>-uat</code> 접미사 금지. 사본이 곧 SHA 분기다.</div></div></div>
+      <div class="rule"><span class="i" aria-hidden="true">✕</span><div><b>feature에 dev/test/release merge</b><div class="sub">역방향 오염. 당겨오는 건 <code>git merge master</code> 만.</div></div></div>
+      <div class="rule"><span class="i" aria-hidden="true">✕</span><div><b>test / release를 어디로든 merge</b><div class="sub">둘 다 목적지 전용. master가 받는 건 <b>feature 단위 merge 또는 그걸 모은 조립 브랜치</b>뿐이다 (release 통째 merge·FF 금지).</div></div></div>
+      <div class="rule"><span class="i" aria-hidden="true">✕</span><div><b>release를 다음 release로 흡수</b><div class="sub">fold-in 금지. 미배포분은 원본 feature에서 새 release로 다시 merge.</div></div></div>
+      <div class="rule"><span class="i" aria-hidden="true">✕</span><div><b>dev/test/release에서 feature 분기</b><div class="sub">항상 master에서. 아니면 미배포 코드를 업고 시작한다.</div></div></div>
+      <div class="rule"><span class="i" aria-hidden="true">✕</span><div><b>공유 브랜치 rebase</b><div class="sub"><code>git merge master</code>로 대신한다.</div></div></div>
+      <div class="rule"><span class="i" aria-hidden="true">✕</span><div><b>dev / test / <u>release</u>에 직접 커밋</b><div class="sub">모든 코드는 feature 경유. dev·test는 리셋 때 소실되고, release는 통째 merge 시 미검증 코드가 조용히 prod로 들어간다.</div></div></div>
+      <div class="rule"><span class="i" aria-hidden="true">✕</span><div><b>Squash / Rebase merge</b><div class="sub">전 경로 Merge Commit. same-SHA가 깨지면 모델 전체가 무의미해진다.</div></div></div>
+      <div class="rule"><span class="i" aria-hidden="true">✕</span><div><b>master에 UAT 미통과분 merge</b><div class="sub">master가 항상 prod와 같아야 hotfix 기준선이 유효하다.</div></div></div>
+      <div class="rule"><span class="i" aria-hidden="true">✕</span><div><b>제외 배포 후 재검증 생략</b><div class="sub">A+B로 UAT 통과 → A만 배포하면 master+A는 미검증 조합. <code>-v2</code> 재조립이 기본.</div></div></div>
+    </div>
+  </section>
+
+  <!-- ════════ 6. 커맨드 ════════ -->
+  <section id="cmds">
+    <div class="shead"><span class="n">06</span><h2>Claude Code 커맨드 — 어떻게 쓰나</h2></div>
+    <p class="sdesc">
+      v4 본문의 <b>권장 도구</b>(부록 B). 규칙을 <code>.claude/</code>에 스킬 1개 + 커맨드 6개로 옮긴 것.<br>
+      ⚠️ <b>아직 레포에 체크인되지 않았다</b>(<code>.claude/</code> untracked) — 지금은 개인 로컬 전용이고 clone만으로는 쓸 수 없다. 07절 참조.<br>
+      <code>imt-git-flow</code>는 <b>스킬</b>이라 아무것도 안 쳐도 브랜치·merge·배포 얘기가 나오면 배경에서 참고된다.
+      <code>/</code>로 시작하는 6개는 <b>직접 입력해 실행하는 커맨드</b>다.<br>
+      하루 흐름: <code class="mono">/imt-feature</code> → 커밋 →
+      <code class="mono">/imt-test</code> → (대기) →
+      <code class="mono">/imt-release</code> → <code class="mono">/imt-deploy</code> → <code class="mono">/imt-sync</code>.
+      막히면 <code class="mono">/imt-status</code>.
+    </p>
+    <div class="card player">
+      <nav class="steps"><ol id="cmdlist"></ol></nav>
+      <div class="stage" id="cmddetail"></div>
+    </div>
+    <div class="panel" style="margin-top:14px">
+      <h3>강제의 한계</h3>
+      <p style="font-size:13px; color:var(--ink-2)">
+        이 도구는 <b>Claude를 통할 때만</b> 유효하다 — 터미널 직접 <code>git push</code>나 GitHub UI의 Squash 버튼은 못 막는다.
+        <b>진짜 강제는 GitHub 설정</b>(Squash/Rebase merge 비활성, branch protection, required PR)이다.
+        커맨드는 "올바른 길을 가장 쉬운 길로" 만드는 생산성 계층이지 최후 방어선이 아니다.
+      </p>
+    </div>
+  </section>
+
+  <!-- ════════ 7. 확정 기록 ════════ -->
+  <section id="issues">
+    <div class="shead"><span class="n">07</span><h2>확정 기록 — 2026-08-14</h2></div>
+    <p class="sdesc">
+      v4는 <b>확정</b>됐다. 초안 단계의 보류 항목 2건(B2·부록 A)과 샌드박스 검증에서 나온 4건(F1–F4)이 모두 닫혔다.
+      근거·재현 스크립트는 <code>TESTING_V4.md</code>에 있다.
+    </p>
+    <div class="rules">
+      <div class="rule"><span class="i" style="color:var(--good)" aria-hidden="true">●</span><div>
+        <b>B2 — dev merge = 선택</b>
+        <div class="sub">연동이 필요할 때만 merge한다. <b>의무 merge는 test / release / master 3회.</b></div></div></div>
+      <div class="rule"><span class="i" style="color:var(--good)" aria-hidden="true">●</span><div>
+        <b>부록 A — epic(버전 트랙) 미도입</b>
+        <div class="sub">버전 트랙은 현행 방식 유지, 운영안은 참고로만 보존. 단
+          <code>release-</code> prefix 금지는 유지 → <code>release-2.13.0-0819</code>는 rename 또는 마감 후 삭제 대상.</div></div></div>
+      <div class="rule"><span class="i" style="color:var(--good)" aria-hidden="true">●</span><div>
+        <b>F1 — 조립 브랜치 유지</b>
+        <div class="sub">prod 트리거가 <b>PR 1건 = 배포 1회</b>라서 묶음 배포에는 조립 브랜치가 필요하다.
+          release-{날짜}와 내용이 중복되는 것은 <b>수용한다</b>(실측: 두 경로의 트리 SHA 동일).
+          제외는 <code>-v2</code> 재조립 + UAT 재검증만으로 한다.</div></div></div>
+      <div class="rule"><span class="i" style="color:var(--good)" aria-hidden="true">●</span><div>
+        <b>F2 — 조립 브랜치 명명 신설</b>
+        <div class="sub">3절 명명 규칙에 <code>assemble/{월일}</code> 추가. 묶음 배포 시에만 만들고 배포 후 삭제.
+          단건이면 만들지 않는다(fast path).</div></div></div>
+      <div class="rule"><span class="i" style="color:var(--good)" aria-hidden="true">●</span><div>
+        <b>F3 — 금지 규칙 7에 release 추가</b>
+        <div class="sub">"dev / test / <b>release-{날짜}</b>에 직접 커밋 금지"로 개정.
+          실측 근거: release 직접 커밋은 통째 merge 시 아무 신호 없이 prod로 들어간다.</div></div></div>
+      <div class="rule"><span class="i" style="color:var(--good)" aria-hidden="true">●</span><div>
+        <b>F4 — 금지 규칙 4 근거 재작성</b>
+        <div class="sub">FF 논거는 FF에만 한정하고, 실제 근거를 <b>① orphan 격리(실측) ② 기본값 안전성</b>으로 다시 썼다.
+          rerere는 근거가 아니라 "통째와 동일한 트리를 보장하는 장치"로 위치를 옮겼다.</div></div></div>
+    </div>
+
+    <div class="panel" style="margin-top:18px">
+      <h3>남은 것은 적용이다 — 13절 재실측 (2026-08-14)</h3>
+      <p style="font-size:13px; color:var(--ink-2); margin-bottom:12px">
+        문서는 확정됐지만 <b>실제 레포에는 아직 적용 전</b>이다. 아래 1~3은 확정과 함께 켜야 하는 강제 장치다 —
+        이게 없으면 규칙이 강제되지 않는다.
+      </p>
+      <table>
+        <thead><tr><th>항목</th><th>현재 상태</th><th>해야 할 것</th></tr></thead>
+        <tbody>
+          <tr><td><b>GitHub merge 설정</b></td>
+              <td>Squash·Rebase merge <b>여전히 허용</b></td>
+              <td><b>①</b> 비활성 — same-SHA의 토대. <code>delete_branch_on_merge</code>는 false 유지</td></tr>
+          <tr><td><b>CI/CD</b></td>
+              <td>concurrency 없음 · 태그 <code>ti-server:master</code> 고정</td>
+              <td><b>②</b> prod concurrency + 버전/SHA 병행 태그 (감사 요건)</td></tr>
+          <tr><td><b>dev divergence</b></td>
+              <td>dev에만 576커밋 / master에만 13커밋</td>
+              <td><b>③</b> 1회 리셋 (orphan 검출 선행)</td></tr>
+          <tr><td>열린 release</td>
+              <td><code>release-0814</code> 배포 완료 · <code>release-2.13.0-0819</code> 존속</td>
+              <td>0814 삭제 · 0819 rename 또는 마감 후 삭제</td></tr>
+          <tr><td><code>test</code> 브랜치</td>
+              <td>생성됨, master 대비 merge 0건 = <b>실사용 전</b></td>
+              <td>다음 기능부터 test PR을 본 리뷰 지점으로</td></tr>
+          <tr><td>feature 네이밍</td>
+              <td>date-first 채택 <b>0/17</b></td>
+              <td>기존 rename 강제 없이 <b>신규부터</b> 적용해 소진</td></tr>
+          <tr><td>Claude Code 도구</td>
+              <td><code>.claude/</code> <b>untracked</b> — 개인 로컬 전용</td>
+              <td>팀 공용으로 쓸 거면 체크인 (스킬 1 + 커맨드 6만, <code>settings.local.json</code>·lock 제외)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <p class="foot">
+    원본: <a href="https://trialinformatics.atlassian.net/wiki/spaces/ImageTrial/pages/716800002/IMT+Git+Branch+v4">Confluence — IMT Git Branch 전략 v4</a>
+    (단일 진실 — 로컬 사본 없음)
+    · 검증 시나리오·실측 기록 <code>TESTING_V4.md</code><br>
+    이 문서는 <b>v4 확정본(2026-08-14)</b>을 시각화한 것이다. 규칙 원본과 충돌하면 원본이 우선.
+    문서는 확정됐고 <b>실제 레포 적용은 진행 전</b>이다 (07절).
+  </p>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   그래프 정의 — 노드/엣지에 step을 달아두고 "step 이하만 렌더"한다.
+   시나리오가 append-only라서 이 방식이면 상태 관리가 필요 없다.
+   ══════════════════════════════════════════════════════════════════ */
+/* master를 중앙 척추에 둔다 — feature는 위로 분기하고, 목적지는 아래로 하강한다.
+   master가 "분기원이면서 동시에 목적지"라는 v4의 이중 성격이 이 배치로 드러난다. */
+const LANES = [
+  { id:'featA',   label:'0814/…-filter', y: 32, color:'featA', from:1 },
+  { id:'featB',   label:'0814/…-export', y: 84, color:'featB', from:2, to:10 },
+  { id:'master',  label:'master',        y:176 },
+  { id:'dev',     label:'dev',           y:254, from:3 },
+  { id:'test',    label:'test',          y:306, from:4 },
+  { id:'release', label:'release-0814',  y:358, from:7, to:10 },
+];
+const COL = c => 108 + c * 54;
+const LANEY = Object.fromEntries(LANES.map(l => [l.id, l.y]));
+
+/* kind: commit(기능 커밋) · base(master 기준선) · merge(merge commit) */
+const NODES = [
+  { id:'m0', lane:'master', col:0, kind:'base',  sha:'9f1c2ab', step:0 },
+  { id:'m1', lane:'master', col:1, kind:'base',  sha:'3d7e4f1', step:0 },
+
+  { id:'a1', lane:'featA',  col:2, kind:'commit', owner:'featA', sha:'a1b2c3d', step:1 },
+  { id:'a2', lane:'featA',  col:3, kind:'commit', owner:'featA', sha:'b2c3d4e', step:1 },
+  { id:'b1', lane:'featB',  col:3, kind:'commit', owner:'featB', sha:'c3d4e5f', step:2 },
+
+  { id:'dA', lane:'dev',    col:4, kind:'merge',  owner:'featA', step:3 },
+  { id:'dB', lane:'dev',    col:5, kind:'merge',  owner:'featB', step:3 },
+
+  { id:'tA', lane:'test',   col:6, kind:'merge',  owner:'featA', step:4 },
+  { id:'tB', lane:'test',   col:7, kind:'merge',  owner:'featB', step:5 },
+
+  { id:'r0', lane:'release',col:8, kind:'base',   sha:'3d7e4f1', step:7 },
+  { id:'rB', lane:'release',col:9, kind:'merge',  owner:'featB', step:7 },
+
+  { id:'mB', lane:'master', col:10, kind:'merge', owner:'featB', step:8 },
+
+  { id:'fT', lane:'test',   col:11, kind:'fwd',   step:9 },
+  { id:'fD', lane:'dev',    col:11, kind:'fwd',   step:9 },
+  { id:'aS', lane:'featA',  col:11, kind:'fwd',   owner:'featA', step:9 },
+];
+const N = Object.fromEntries(NODES.map(n => [n.id, n]));
+
+/* kind: lane(같은 레인) · branch(분기) · merge(merge) */
+const EDGES = [
+  { a:'m0', b:'m1', kind:'lane',   step:0 },
+  { a:'m1', b:'a1', kind:'branch', step:1, owner:'featA' },
+  { a:'a1', b:'a2', kind:'lane',   step:1, owner:'featA' },
+  { a:'m1', b:'b1', kind:'branch', step:2, owner:'featB' },
+
+  { a:'a2', b:'dA', kind:'merge',  step:3, owner:'featA' },
+  { a:'b1', b:'dB', kind:'merge',  step:3, owner:'featB' },
+  { a:'dA', b:'dB', kind:'lane',   step:3 },
+
+  { a:'a2', b:'tA', kind:'merge',  step:4, owner:'featA' },
+  { a:'b1', b:'tB', kind:'merge',  step:5, owner:'featB' },
+  { a:'tA', b:'tB', kind:'lane',   step:5 },
+
+  { a:'m1', b:'r0', kind:'branch', step:7 },
+  { a:'r0', b:'rB', kind:'lane',   step:7 },
+  { a:'b1', b:'rB', kind:'merge',  step:7, owner:'featB' },
+
+  { a:'m1', b:'mB', kind:'lane',   step:8 },
+  { a:'b1', b:'mB', kind:'merge',  step:8, owner:'featB' },
+
+  { a:'mB', b:'fT', kind:'fwd',    step:9 },
+  { a:'mB', b:'fD', kind:'fwd',    step:9 },
+  { a:'mB', b:'aS', kind:'fwd',    step:9 },
+  { a:'tB', b:'fT', kind:'lane',   step:9 },
+  { a:'dB', b:'fD', kind:'lane',   step:9 },
+  { a:'a2', b:'aS', kind:'lane',   step:9 },
+];
+
+const A = 'featA', B = 'featB';
+const STEPS = [
+  { t:'시작 — master만 있다',
+    b:'master는 prod 진실이자 모든 feature의 분기점이다. 지금 prod에 도는 것 = master tip.',
+    cmd:'$ git log master --oneline -2\n3d7e4f1 fix: 엑셀 시트명 길이\n9f1c2ab feat: 판독자 배정',
+    why:'master가 prod와 항상 같아야 <b>hotfix 기준선</b>이 유효하다. 그래서 UAT 미통과분은 절대 들어오지 않는다.',
+    k:{}, e:{ dev:[], test:[], uat:[], prod:['base'] } },
+
+  { t:'featA 분기 — 항상 master에서',
+    b:'목표 배포일(0814)을 앞에 붙여 date-first로 만든다. 타겟별 사본은 만들지 않는다 — 이 브랜치 하나가 prod 반영까지 유일한 원본이다.',
+    cmd:'/imt-feature IMTDEV-1001 filter 0814\n→ git checkout -b 0814/YH/IMTDEV-1001-filter origin/master',
+    why:'날짜를 앞에 두면 <code>git branch --list "0814/*"</code>로 그날 배포 후보가 한 번에 묶인다.',
+    k:{ [A]:{} }, e:{ dev:[], test:[], uat:[], prod:['base'] } },
+
+  { t:'featB 분기 — 역시 master에서',
+    b:'featA가 진행 중이라도 featB는 featA를 모른다. 둘 다 master에서 갈라져 서로 독립이다.',
+    cmd:'/imt-feature IMTDEV-1002 export 0814\n→ git checkout -b 0814/YH/IMTDEV-1002-export origin/master',
+    why:'dev나 test에서 분기하면 <b>미배포 기능을 업고</b> 시작한다. 그 상태로 master에 merge하면 남의 기능이 딸려 나간다.',
+    k:{ [A]:{}, [B]:{} }, e:{ dev:[], test:[], uat:[], prod:['base'] } },
+
+  { t:'dev merge (선택) — 연동 확인',
+    b:'FE와 붙여봐야 하면 dev에 merge한다. push하면 자동 배포. 게이트가 아니라 놀이터이므로 리뷰도 생략 가능하다.',
+    cmd:'git checkout dev && git merge --no-ff 0814/YH/IMTDEV-1001-filter\ngit merge --no-ff 0814/YH/IMTDEV-1002-export && git push origin dev',
+    why:'dev는 <b>배포 파이프라인 밖</b>이다. 휘발성이라 정기 리셋되고, 그래서 dev에 직접 커밋하면 소실된다.',
+    k:{ [A]:{dev:1}, [B]:{dev:1} }, e:{ dev:[A,B], test:[], uat:[], prod:['base'] } },
+
+  { t:'featA → test PR — 본 리뷰 1회',
+    b:'QA 받을 준비가 되면 test로 PR을 올린다. v4에서 코드 리뷰는 오직 여기서 한 번 한다 — QA 직전이 가장 좋은 시점이다.',
+    cmd:'/imt-test\n→ gh pr create --base test  ← Files Changed 탭에서 본 리뷰\n→ gh workflow run test-build-deploy.yml --ref test',
+    why:'같은 커밋이 네 곳을 흐르므로 리뷰는 한 번이면 된다. release·master PR은 <b>조합 확인 수준</b>으로 가볍게 본다.',
+    k:{ [A]:{dev:1,test:1}, [B]:{dev:1} }, e:{ dev:[A,B], test:[A], uat:[], prod:['base'] } },
+
+  { t:'featB → test PR',
+    b:'featB도 QA에 올린다. test 환경은 dispatch라서, featA를 검증하던 QA가 원하는 시점에 다시 배포한다.',
+    cmd:'/imt-test\n→ gh pr create --base test\n→ gh workflow run test-build-deploy.yml --ref test',
+    why:'test가 push 자동이면 featB merge 순간 featA 검증 환경이 <b>덮어써진다.</b> dispatch인 이유가 이것이다.',
+    k:{ [A]:{dev:1,test:1}, [B]:{dev:1,test:1} }, e:{ dev:[A,B], test:[A,B], uat:[], prod:['base'] } },
+
+  { t:'featA — QA 통과, 배포일 미정 → test 대기',
+    b:'QA는 끝났지만 배포일이 안 정해졌다. v4에서 featA는 test에 그대로 머문다. 이게 v3에 없던 개념이고, 4브랜치로 늘린 이유다.',
+    cmd:'# 아무것도 하지 않는다. test에 남아 대기.\n$ git log test --not master --merges --oneline   # 대기 목록 확인',
+    why:'v3에는 대기 개념이 없어서 이런 기능이 dev soup에 섞여 관리가 불가능했다. <b>대기 중인 기능은 다른 기능의 배포를 막지 않는다.</b>',
+    k:{ [A]:{dev:1,test:1,wait:1}, [B]:{dev:1,test:1} }, e:{ dev:[A,B], test:[A,B], uat:[], prod:['base'] } },
+
+  { t:'featB 배포 확정 → release-0814 조립 → UAT',
+    b:'배포일이 확정된 featB만 모은다. release는 반드시 master에서 새로 따고, featB만 merge한다. featA는 건드리지 않는다.',
+    cmd:'/imt-release 0814\n→ git checkout -b release-0814 origin/master   ← test가 아니라 master에서!\n→ git merge --no-ff 0814/YH/IMTDEV-1002-export\n→ gh workflow run uat-build-deploy.yml --ref release-0814',
+    why:'test에서 release를 따면 <b>대기 중인 featA가 딸려 들어간다.</b> master에서 따야 UAT 트리가 정확히 "master + featB"가 된다.',
+    k:{ [A]:{dev:1,test:1,wait:1}, [B]:{dev:1,test:1,release:1} }, e:{ dev:[A,B], test:[A,B], uat:[B], prod:['base'] } },
+
+  { t:'UAT 통과 → featB를 master에 merge → prod',
+    b:'release를 master에 붓지 않는다. featB 브랜치를 master에 merge한다 — UAT에서 검증된 그 SHA 그대로.',
+    cmd:'/imt-deploy release-0814\n→ gh pr create --base master   ← PR 1건 = 배포 1회\n→ git diff release-0814 master  # 비어 있어야 정상',
+    why:'featB의 커밋 <code class="sha">c3d4e5f</code> 하나가 이제 dev·test·release·master <b>네 곳에 전부</b> 있다. 검증한 것과 배포된 것이 같다는 증적이 이것이다.',
+    k:{ [A]:{dev:1,test:1,wait:1}, [B]:{dev:1,test:1,release:1,master:1} }, e:{ dev:[A,B], test:[A,B], uat:[B], prod:['base',B] } },
+
+  { t:'사후 — forward merge + featA 최신화',
+    b:'master가 움직였으니 열려 있는 목적지에 기준선을 갱신하고, 대기 중인 featA에도 master를 당겨온다.',
+    cmd:'/imt-sync B\n→ git checkout dev  && git merge origin/master && git push\n→ gh pr create --base test --head master     # 공유 브랜치는 PR\n→ git checkout 0814/…-filter && git merge master   # 대기가 길수록 필수',
+    why:'이걸 빼먹으면 다음 배포에서 <code>git diff release master</code>에 무관한 커밋이 섞여 보여 <b>정합성 판독이 불가능해진다.</b>',
+    k:{ [A]:{dev:1,test:1,wait:1,sync:1}, [B]:{dev:1,test:1,release:1,master:1} }, e:{ dev:[A,B], test:[A,B], uat:[B], prod:['base',B] } },
+
+  { t:'정리 — release 삭제, featB 삭제, featA는 계속 대기',
+    b:'사이클이 끝난 release-0814는 삭제한다(다음 release로 흡수 금지). prod 반영된 featB도 삭제. featA는 test에서 다음 기회를 기다린다.',
+    cmd:'git push origin --delete release-0814\ngit push origin --delete 0814/YH/IMTDEV-1002-export\n# featA는 삭제하지 않는다 — 아직 master에 없다',
+    why:'featA가 배포 확정되면 <b>그 시점의 새 release</b>에 merge한다. 결국 featA는 featB의 배포를 한 번도 막지 않았다 — 이것이 시나리오 2의 결론이다.',
+    k:{ [A]:{dev:1,test:1,wait:1,sync:1}, [B]:{dev:1,test:1,release:1,master:1,done:1} }, e:{ dev:[A,B], test:[A,B], uat:[], prod:['base',B] } },
+];
+
+const FEAT = {
+  [A]: { label:'featA', branch:'0814/YH/IMTDEV-1001-filter', sha:'b2c3d4e', varname:'--featA' },
+  [B]: { label:'featB', branch:'0814/YH/IMTDEV-1002-export', sha:'c3d4e5f', varname:'--featB' },
+};
+const ENVS = [
+  { id:'dev',  nm:'dev',  trig:'⚡ push 자동' },
+  { id:'test', nm:'test', trig:'▶ dispatch' },
+  { id:'uat',  nm:'uat',  trig:'▶ dispatch' },
+  { id:'prod', nm:'prod', trig:'⚡ PR merged' },
+];
+
+let cur = 0;
+
+/* ── 그래프 렌더 ────────────────────────────────────────────────── */
+function colorOf(owner) { return owner ? `var(${FEAT[owner].varname})` : 'var(--ink-2)'; }
+
+/* gitk 스타일: 자기 레인을 따라 달린 뒤 목표 지점에서 급하강(merge)하거나
+   분기 직후 급상승(branch)한다. 완만한 대각선으로 그으면 레인을 여러 개
+   가로지르며 스파게티가 된다. */
+function edgePath(a, b, kind) {
+  const x1 = COL(a.col), y1 = LANEY[a.lane], x2 = COL(b.col), y2 = LANEY[b.lane];
+  if (y1 === y2) return `M${x1} ${y1} H${x2}`;
+  const k = 22;
+  if (kind === 'branch') {
+    // 부모 커밋 직후에 자기 레인으로 올라가고, 거기서 수평 이동
+    const xe = Math.min(x2, x1 + k);
+    return `M${x1} ${y1} C${x1 + k * .55} ${y1}, ${xe - k * .45} ${y2}, ${xe} ${y2} H${x2}`;
+  }
+  // merge / fwd: 소스 레인을 따라 달린 뒤 목표 레인으로 내려꽂는다
+  const xs = Math.max(x1, x2 - k);
+  return `M${x1} ${y1} H${xs} C${xs + k * .55} ${y1}, ${x2 - k * .45} ${y2}, ${x2} ${y2}`;
+}
+
+function renderGraph() {
+  const s = STEPS[cur], step = cur;
+  const gone = id => (step >= 10 && (N[id].lane === 'release' || N[id].owner === B && N[id].lane === 'featB'));
+  let out = '';
+
+  // 레인 가이드 + 라벨
+  for (const l of LANES) {
+    const born = l.from == null || step >= l.from;
+    const dead = l.to != null && step >= l.to;
+    if (!born) continue;
+    const cls = dead ? 'lane gone' : 'lane';
+    out += `<line class="${cls}" x1="104" y1="${l.y}" x2="730" y2="${l.y}" stroke-dasharray="2 4"/>`;
+    const lc = l.color ? `fill:var(--${l.color})` : '';
+    out += `<text class="glabel${dead ? ' gone' : ''}" x="0" y="${l.y + 4}" style="${lc}">${l.label}${dead ? ' ✕' : ''}</text>`;
+  }
+
+  // 엣지 (노드보다 먼저 = 아래에 깔림)
+  for (const e of EDGES) {
+    if (step < e.step) continue;
+    const dead = gone(e.a) || gone(e.b);
+    const stroke = e.kind === 'fwd' ? 'var(--ink-3)' : colorOf(e.owner);
+    const dash = e.kind === 'fwd' ? ' stroke-dasharray="4 3"' : '';
+    const cls = 'edge' + (dead ? ' gone' : (e.step === step ? '' : ' fade'));
+    out += `<path class="${cls}" d="${edgePath(N[e.a], N[e.b], e.kind)}" stroke="${stroke}"${dash}/>`;
+  }
+
+  // 노드
+  for (const n of NODES) {
+    if (step < n.step) continue;
+    const x = COL(n.col), y = LANEY[n.lane];
+    const dead = gone(n.id);
+    const fill = n.kind === 'base' ? 'var(--ink-2)' : (n.kind === 'fwd' ? 'var(--ink-3)' : colorOf(n.owner));
+    const r = n.kind === 'merge' ? 7 : 6;
+    const fresh = n.step === step;
+    const cls = 'node' + (dead ? ' gone' : (fresh ? ' pulse' : ''));
+    out += `<circle class="${cls}" cx="${x}" cy="${y}" r="${r}" fill="${fill}"/>`;
+    if (n.kind === 'merge') out += `<circle class="${cls}" cx="${x}" cy="${y}" r="2.5" fill="var(--surface-1)"/>`;
+    if (n.sha && !dead) out += `<text class="gsha" x="${x}" y="${y - 13}" text-anchor="middle">${n.sha}</text>`;
+  }
+
+  // 강조: featB의 SHA가 여러 곳에 있다는 것 (step 8 이후)
+  if (step >= 8 && step < 10) {
+    out += `<text class="gsha" x="730" y="${LANEY.master + 22}" text-anchor="end" fill="var(--good-text)">c3d4e5f — 같은 SHA가 네 곳에 ✓</text>`;
+  }
+  if (step === 7) {
+    out += `<text class="gsha" x="${COL(8) - 6}" y="${LANEY.release + 24}" fill="var(--ink-3)">master에서 새로 생성 — test에서 따지 않는다</text>`;
+  }
+  if (step === 6) {
+    out += `<text class="gsha" x="${COL(6) + 10}" y="${LANEY.test + 22}" fill="var(--warning)">◆ featA 대기 중</text>`;
+  }
+
+  document.getElementById('graph').innerHTML = out;
+}
+
+/* ── 칸반 렌더 ──────────────────────────────────────────────────── */
+function renderKanban() {
+  const s = STEPS[cur];
+  const rows = Object.keys(FEAT).filter(f => s.k[f]);
+  const tb = document.querySelector('#kanban tbody');
+  if (!rows.length) {
+    tb.innerHTML = `<tr><td colspan="6" class="empty" style="padding:14px 8px">아직 feature 브랜치가 없다 — master 기준선만 있는 상태</td></tr>`;
+    return;
+  }
+  tb.innerHTML = rows.map(f => {
+    const st = s.k[f];
+    const cell = v => v ? '<td class="c yes">✓</td>' : '<td class="c no">—</td>';
+    let status = '개발 중', flag = '';
+    if (st.done)        { status = '삭제 가능';      flag = '<span class="flag ship"><span class="i">●</span>완료</span>'; }
+    else if (st.master) { status = 'prod 반영';      flag = '<span class="flag ship"><span class="i">●</span>배포됨</span>'; }
+    else if (st.release){ status = '이번 배포 후보';  flag = '<span class="flag ship"><span class="i">●</span>UAT</span>'; }
+    else if (st.wait)   { status = '배포일 미정';    flag = '<span class="flag wait"><span class="i">◆</span>대기</span>'; }
+    else if (st.test)   { status = 'QA 중';          flag = ''; }
+    if (st.sync) status += ' · 최신화';
+    return `<tr>
+      <td><span class="fname"><span class="dot" style="background:var(${FEAT[f].varname})"></span>
+        <span>${FEAT[f].label}</span></span></td>
+      ${cell(st.dev)}${cell(st.test)}${cell(st.release)}${cell(st.master)}
+      <td class="stat">${flag ? flag + ' ' : ''}${status}</td></tr>`;
+  }).join('');
+}
+
+/* ── 환경 렌더 ──────────────────────────────────────────────────── */
+function renderEnvs() {
+  const s = STEPS[cur];
+  document.getElementById('envs').innerHTML = ENVS.map(env => {
+    const items = s.e[env.id] || [];
+    const body = items.length
+      ? items.map(it => it === 'base'
+          ? `<span class="chip"><span class="dot" style="background:var(--ink-2)"></span>master 기준선</span>`
+          : `<span class="chip"><span class="dot" style="background:var(${FEAT[it].varname})"></span>${FEAT[it].label}
+             <span class="sha">${FEAT[it].sha}</span></span>`).join('')
+      : `<span class="empty">배포 안 됨</span>`;
+    return `<div class="env"><div class="top"><span class="nm">${env.nm}</span>
+      <span class="trig">${env.trig}</span></div><div class="body">${body}</div></div>`;
+  }).join('');
+}
+
+/* ── 내레이션 ───────────────────────────────────────────────────── */
+function renderNarr() {
+  const s = STEPS[cur];
+  document.getElementById('n-title').textContent = `${cur}. ${s.t}`;
+  document.getElementById('n-body').textContent = s.b;
+  document.getElementById('n-cmd').textContent = s.cmd;
+  document.getElementById('n-why').innerHTML = s.why;
+  document.getElementById('counter').textContent = `${cur + 1} / ${STEPS.length}`;
+  document.getElementById('prev').disabled = cur === 0;
+  document.getElementById('next').disabled = cur === STEPS.length - 1;
+  document.querySelectorAll('#steplist button').forEach((b, i) =>
+    b.setAttribute('aria-current', i === cur ? 'true' : 'false'));
+}
+
+function render() {
+  renderGraph(); renderKanban(); renderEnvs(); renderNarr();
+  history.replaceState(null, '', `#step-${cur}`);   // 단계 딥링크
+}
+
+/* ── 부트 ───────────────────────────────────────────────────────── */
+document.getElementById('steplist').innerHTML = STEPS.map((s, i) =>
+  `<li><button type="button" data-i="${i}"><span class="idx">${i}</span><span>${s.t}</span></button></li>`).join('');
+document.getElementById('steplist').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  cur = +b.dataset.i; render();
+});
+document.getElementById('prev').onclick = () => { if (cur > 0) { cur--; render(); } };
+document.getElementById('next').onclick = () => { if (cur < STEPS.length - 1) { cur++; render(); } };
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft'  && cur > 0)                { cur--; render(); }
+  if (e.key === 'ArrowRight' && cur < STEPS.length - 1) { cur++; render(); }
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   커맨드 레퍼런스 — 각 커맨드의 호출/절차/승인 게이트/거부 규칙
+   내용은 .claude/commands/*.md 와 일치시킨다 (커맨드 파일이 진실).
+   ══════════════════════════════════════════════════════════════════ */
+const CMDS = [
+  {
+    id:'feature', nm:'/imt-feature', tag:'master에서 새 feature 분기',
+    /* innerHTML로 넣으므로 &lt; 로 escape — 안 하면 <JIRA>가 태그로 파싱돼 사라진다 */
+    sig:'/imt-feature &lt;JIRA&gt; &lt;기능명&gt; [MMDD] [이니셜]\n\n예) /imt-feature IMTDEV-1001 filter 0814\n  → 0814/YH/IMTDEV-1001-filter',
+    when:'새 작업을 시작할 때. 가장 먼저 치는 것.',
+    proc:[
+      '인자 파싱 — 기능명을 <b>kebab-case로 정규화</b>(공백→<code>-</code>, 소문자)',
+      'MMDD가 없으면 <b>목표 배포일을 물어본다</b> (미정이면 잠정값이라도 받아 date-first 유지)',
+      '이니셜이 없으면 <code>git config user.name</code>에서 추정, 애매하면 물어본다',
+      '<code>git fetch origin</code> 후 최종 브랜치명을 한 줄로 보여준다',
+      '<b><code>git checkout -b {브랜치} origin/master</code></b> — 현재 브랜치가 아니라 항상 origin/master 기준',
+      '<code>rerere.enabled</code>가 꺼져 있으면 켠다 (같은 feature를 3~4곳에 반복 merge하므로 필수)',
+    ],
+    gates:['특별한 승인 게이트 없음 — 로컬 브랜치 생성뿐이라 되돌리기 쉽다'],
+    guards:[
+      '네이밍이 규칙에 안 맞으면 <b>만들지 않고 교정안을 제시</b>한다',
+      '<code>-dev</code> / <code>-test</code> 같은 <b>타겟별 사본 명명 거부</b>',
+      '현재 체크아웃한 브랜치에서 분기하지 않는다 — 작업트리가 섞여 들어가는 것을 막는다',
+    ],
+    term:'<span class="you">> /imt-feature IMTDEV-1001 filter 0814</span>\n\n'
+       + '브랜치명 : <b>0814/YH/IMTDEV-1001-filter</b>\n'
+       + '분기원   : origin/master (3d7e4f1)\n'
+       + 'rerere   : <span class="ok">이미 활성</span>\n\n'
+       + '생성했습니다. 커밋 후 <b>/imt-test</b>로 QA에 올리세요.',
+    next:'커밋한 뒤 <b>/imt-test</b>. master가 움직이면 <b>/imt-sync A</b>로 최신화.',
+  },
+  {
+    id:'test', nm:'/imt-test', tag:'feature → test PR (본 리뷰 1회) → test dispatch',
+    sig:'/imt-test        (인자 없음 — feature 브랜치에서 실행)',
+    when:'QA 받을 준비가 됐을 때. v4에서 <b>코드 리뷰는 여기서 딱 한 번</b> 한다.',
+    proc:[
+      '<code>git fetch origin</code> → <b><code>origin/test</code> 존재 확인</b>',
+      '현재 브랜치가 feature인지 확인 (master/test/release/dev면 중단)',
+      'master보다 뒤처졌으면 <code>git merge master</code>를 권한다 (충돌은 로컬에서 rerere로)',
+      '푸시 안 된 커밋이 있으면 <code>git push -u origin HEAD</code>',
+      '<b><code>gh pr create --base test</code></b> — 제목 영어 70자 이내, 본문 한국어',
+      'PR URL을 주면서 <b>여기가 본 리뷰 지점</b>임을 알린다 (Files Changed 탭)',
+      '승인 후 <code>gh workflow run test-build-deploy.yml --ref test</code>',
+    ],
+    gates:[
+      '<b>test 브랜치가 없으면 중단</b>한다 — 13절 전환 스텝이라 신설 여부를 먼저 묻는다',
+      '<b>test 환경 dispatch 전 승인</b> — 되돌리기 어려운 배포 동작',
+    ],
+    guards:[
+      'Squash 금지 — Merge Commit만',
+      '<code>test</code>를 feature로 되받는 <b>역방향 merge 거부</b>',
+    ],
+    term:'<span class="you">> /imt-test</span>\n\n'
+       + '<span class="ok">✓</span> origin/test 존재\n'
+       + '<span class="ok">✓</span> 현재 브랜치: 0814/YH/IMTDEV-1001-filter (feature)\n'
+       + '<span class="warn">⚠</span> master보다 2커밋 뒤처짐 → <b>git merge master</b> 권고\n\n'
+       + 'PR <b>#12</b> 생성 (base: <b>test</b>)\n'
+       + '  https://github.com/…/pull/12\n'
+       + '  ← 본 리뷰는 이 PR의 Files Changed 탭에서 1회\n\n'
+       + '<span class="warn">■</span> PR merge 후 test 환경에 dispatch할까요?',
+    next:'QA 통과 후 배포일이 <b>미정이면 그대로 대기</b>(정상). 확정되면 <b>/imt-release</b>.',
+  },
+  {
+    id:'release', nm:'/imt-release', tag:'배포 확정분만 release-{날짜}에 조립 → uat dispatch',
+    sig:'/imt-release [MMDD] [feature 브랜치...]\n\n예) /imt-release 0814\n    /imt-release 0814 0814/YH/IMTDEV-1002-export',
+    when:'배포일이 확정됐을 때. test 대기분은 건드리지 않는다.',
+    proc:[
+      'MMDD 확정. 후보는 <code>git log origin/test --not origin/master --merges</code>에서 뽑는다',
+      '<b>배포 확정 여부는 사용자에게 확인</b>한다 — Claude가 판단하지 않는다',
+      '<b><code>git checkout -b release-{MMDD} origin/master</code></b> — test가 아니라 master에서!',
+      '<code>git merge --no-ff &lt;feature&gt;</code>로 확정분만 병합 (충돌은 <b>항상 로컬</b>에서)',
+      '<code>git log release-{MMDD} --not master --merges</code>로 UAT 내용물을 보여준다',
+      '<code>gh run list --workflow=uat-build-deploy.yml</code>로 현재 UAT 점유 확인',
+      '승인 후 <code>gh workflow run uat-build-deploy.yml --ref release-{MMDD}</code>',
+    ],
+    gates:[
+      '<b>UAT 점유 경고</b> — 다른 release가 검증 중이면 덮어쓴다고 알리고 진행 여부를 묻는다',
+      '<b>uat dispatch 전 승인</b>',
+    ],
+    guards:[
+      '<code>release-2.13.0-0819</code> 같은 <b>버전+날짜 혼합 명명 거부</b> → <code>epic/</code> 안내',
+      '<b>fold-in 금지</b> — 다른 release를 이번 release에 흡수하지 않는다. 미배포분은 원본 feature에서 다시 merge',
+      'test/dev에서 release를 따지 않는다 — 대기 중인 기능이 딸려 들어간다',
+    ],
+    term:'<span class="you">> /imt-release 0814</span>\n\n'
+       + 'test에 올라간 기능 (배포 확정 여부 확인 필요):\n'
+       + '  1) 0814/YH/IMTDEV-1001-filter\n'
+       + '  2) 0814/YH/IMTDEV-1002-export\n'
+       + '<span class="you">> 2번만</span>\n\n'
+       + 'release-0814 생성 (origin/master 기준)\n'
+       + 'merge --no-ff …-export  <span class="ok">✓ 충돌 없음</span>\n\n'
+       + 'UAT에 올라갈 것 = master + 위 1건\n'
+       + '현재 UAT 점유 : release-0807 (2시간 전 검증 시작)\n'
+       + '<span class="warn">⚠</span> 덮어씁니다. 진행할까요?',
+    next:'UAT 통과 → <b>/imt-deploy</b>. 기능을 제외할 거면 <code>release-{날짜}-v2</code> 재조립 + UAT 재검증(4.5절).',
+  },
+  {
+    id:'deploy', nm:'/imt-deploy', tag:'조립 PR 1건으로 master 반영 = prod 배포',
+    sig:'/imt-deploy [release-{날짜}]\n\n예) /imt-deploy release-0814\n    /imt-deploy            (생략 시 열린 release 탐색)',
+    when:'UAT를 통과했을 때. <b>release는 master로 merge하지 않는다</b> — feature/조립 브랜치를 merge한다.',
+    proc:[
+      '<code>git log &lt;release&gt; --not master --merges</code>로 UAT에 올라간 목록을 보여준다',
+      '배포 대상이 UAT 조합의 <b>부분집합이면 4.5절 재검증 경고</b> (겹치는 파일 목록을 근거로 제시)',
+      '조립: <code>git checkout -b assemble/{날짜} origin/master</code> → feature들 <code>merge --no-ff</code>',
+      '<b><code>gh pr create --base master</code> — PR 1건 = 배포 1회</b> (feature별 PR은 배포 N회)',
+      '<b><code>git diff &lt;release&gt; master</code> 판독</b> — 비었음 / 제외분만 / 그 외',
+      'PR 링크 + 포함 목록 + diff 판독 결과를 한 화면에 요약',
+      '■ 승인받은 뒤에만 merge → prod 자동배포',
+    ],
+    gates:[
+      '<b>최종 merge 전 승인 필수</b> — 이 커맨드는 절대 자동으로 merge하지 않는다',
+      'diff가 <b>"그 외"로 나오면 승인 단계로 넘어가지 않고 중단</b>한다 (충돌이 다르게 풀렸거나 forward merge 누락)',
+    ],
+    guards:[
+      '<code>release</code>를 master에 통째 merge 금지 (FF 포함)',
+      'feature별 개별 PR 난사 금지 — 배포가 N회 돈다',
+      'UAT 미통과분 master 반영 금지',
+    ],
+    term:'<span class="you">> /imt-deploy release-0814</span>\n\n'
+       + 'UAT 검증 조합 : master + export\n'
+       + '배포 대상     : export\n'
+       + '              <span class="ok">→ 제외 없음. 4.5절 재검증 불필요</span>\n\n'
+       + '조립 PR <b>#13</b> (base: master)  ← PR 1건 = 배포 1회\n'
+       + 'git diff release-0814 master → <span class="ok">비어 있음</span>\n'
+       + '  = release 전체가 그대로 prod 반영됨 (통째와 동일함을 증명)\n\n'
+       + '<span class="warn">■</span> 이대로 prod 배포할까요?\n'
+       + '   <span class="ok">승인 없이는 merge하지 않습니다.</span>',
+    next:'배포 후 <b>/imt-sync B</b> — forward merge + release 삭제 + 반영된 feature 삭제.',
+  },
+  {
+    id:'sync', nm:'/imt-sync', tag:'A: feature 최신화 · B: 배포 후 forward merge',
+    sig:'/imt-sync [A|B]     (생략 시 현재 브랜치로 판단)\n\n  A = git merge master  — 내 feature를 최신화\n  B = master → 열린 test / release / dev 로 forward merge',
+    when:'A: master가 움직일 때마다 (특히 test에서 오래 대기하는 기능). B: prod 배포·hotfix 직후.',
+    proc:[
+      '<b>[A]</b> <code>git checkout &lt;feature&gt;</code> → <code>git merge origin/master</code> → 충돌은 로컬에서 해결 → push',
+      '<b>[A]</b> rerere가 자동 재적용한 해결은 <code>git diff</code>로 <b>눈으로 검증</b> (틀렸으면 <code>git rerere forget</code>)',
+      '<b>[A]</b> feature가 움직였으니 <b>이미 merge해둔 목적지에 재병합</b>하라고 안내 (2번째부터는 새 커밋만 diff)',
+      '<b>[B]</b> 각 브랜치가 뒤처졌는지 <code>git merge-base --is-ancestor</code>로 판정',
+      '<b>[B]</b> <code>dev</code>는 로컬 merge + push 허용(휘발성), <b><code>test</code>/<code>release</code>는 PR이 기본</b>(공유 브랜치)',
+      '<b>[B]</b> 살아 있는 feature 목록에 A를 돌리라고 안내',
+      '<b>[B]</b> 끝난 release 삭제 / prod 반영된 feature 삭제를 <b>승인 후</b> 수행',
+    ],
+    gates:[
+      '<b>삭제·force push 전 승인</b>. <code>--force-with-lease</code> 없는 force push 금지',
+      'test 리셋이 필요해 보이면 <b>절차만 안내하고 실행하지 않는다</b> (대기 기능 재구성 목록은 릴리스 운영자가 작성)',
+    ],
+    guards:[
+      '<b><code>git merge dev</code> / <code>test</code> / <code>release</code> 거부</b> — 미배포 기능이 master까지 딸려 들어간다. 당겨오는 건 master만',
+      '공유 브랜치 rebase 금지',
+      'prod 미반영 feature는 삭제하지 않는다 (test 대기분 보호)',
+    ],
+    term:'<span class="you">> /imt-sync B</span>\n\n'
+       + 'master 이동: 3d7e4f1 → <b>8f0ae97</b>\n\n'
+       + '  dev                     뒤처짐 → 로컬 merge + push\n'
+       + '  test                    뒤처짐 → <b>PR 생성</b> (공유 브랜치)\n'
+       + '  release-0819            뒤처짐 → <b>PR 생성</b>\n'
+       + '  0814/YH/…-filter        최신화 필요 → git merge master\n\n'
+       + 'release-0814는 배포 완료 → 삭제 대상\n'
+       + '<span class="warn">■</span> 삭제할까요?',
+    next:'대기 기능이 5개를 넘거나 한 달이 지나면 7절 <b>test 리셋 + 재구성</b> 주기다.',
+  },
+  {
+    id:'status', nm:'/imt-status', tag:'칸반 보드 + 금지 규칙 위반 스캔 (읽기 전용)',
+    sig:'/imt-status      (인자 없음)',
+    when:'"지금 뭐가 어디까지 갔지?"가 헷갈릴 때. 아무것도 바꾸지 않으니 아무 때나.',
+    proc:[
+      '<code>git fetch origin --prune</code>',
+      '<code>git branch -r --contains &lt;feature&gt;</code>로 각 기능이 merge된 목적지를 뽑아 <b>칸반표로 렌더</b>',
+      'master보다 뒤처진 브랜치에 <b>⚠ 최신화 필요</b> 표시',
+      '열린 release마다 <code>--not origin/master</code>로 UAT 후보 목록',
+      '<b>위반 스캔 3종</b> — 타겟별 사본 명명 / release 네이밍 / dev·test 직접 커밋(orphan)',
+      '요약 3줄 — UAT 점유 / test 대기 수(<b>5개 초과면 리셋 주기</b>) / 최신화·forward merge 필요 목록',
+    ],
+    gates:['없음 — fetch 외에 아무것도 변경하지 않는다'],
+    guards:[
+      '배포 확정 여부를 <b>추측하지 않는다</b> — git이 아는 것(merge 여부)만 사실로 보고하고 나머지는 사용자에게 확인',
+    ],
+    term:'<span class="you">> /imt-status</span>\n\n'
+       + 'feature                      dev  test  rel-0819  master\n'
+       + '0814/YH/…-filter              ✓    ✓      —        —    <span class="warn">◆ 대기</span>\n'
+       + '0819/MK/…-export              ✓    —      —        —    개발 중\n\n'
+       + 'UAT 점유 : release-0819 (dispatch 이력 없음 — 아직 안 올림)\n'
+       + 'test 대기 : 1개\n'
+       + '위반 스캔 : <span class="ok">사본 없음 ✓ / release 네이밍 정상 ✓ / 직접 커밋 없음 ✓</span>',
+    next:'대기가 길어진 기능이 보이면 <b>/imt-sync A</b>, 배포 확정된 게 있으면 <b>/imt-release</b>.',
+  },
+];
+
+let curCmd = 0;
+
+function renderCmd() {
+  const c = CMDS[curCmd];
+  const li = (arr, cls, icon) => arr.map(t =>
+    `<li class="${cls}"><span class="i" aria-hidden="true">${icon}</span><span>${t}</span></li>`).join('');
+  document.getElementById('cmddetail').innerHTML = `
+    <div class="cmdhead"><span class="nm">${c.nm}</span><span class="tag">${c.tag}</span></div>
+    <div class="callsig">${c.sig}</div>
+    <div class="cmdsec"><h4>언제</h4><p style="font-size:13px;color:var(--ink-2)">${c.when}</p></div>
+    <div class="cmdsec"><h4>하는 일</h4><ol class="proc">${c.proc.map(s => `<li>${s}</li>`).join('')}</ol></div>
+    <div class="cmdgrid">
+      <div><h4>■ 멈추고 물어보는 지점</h4><ul class="plain">${li(c.gates, 'gate', '■')}</ul></div>
+      <div><h4>✕ 거부하는 것</h4><ul class="plain">${li(c.guards, 'guard', '✕')}</ul></div>
+    </div>
+    <div class="cmdsec"><h4>실제로 이렇게 보인다</h4><pre class="term">${c.term}</pre></div>
+    <p class="nextup">→ 다음: ${c.next}</p>`;
+  document.querySelectorAll('#cmdlist button').forEach((b, i) =>
+    b.setAttribute('aria-current', i === curCmd ? 'true' : 'false'));
+}
+
+document.getElementById('cmdlist').innerHTML = CMDS.map((c, i) =>
+  `<li><button type="button" data-i="${i}"><span class="idx">${i + 1}</span>
+    <span><span class="mono">${c.nm}</span></span></button></li>`).join('');
+document.getElementById('cmdlist').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  curCmd = +b.dataset.i; renderCmd();
+});
+renderCmd();
+
+const fromHash = parseInt((location.hash.match(/^#step-(\d+)$/) || [])[1], 10);
+if (Number.isInteger(fromHash) && fromHash >= 0 && fromHash < STEPS.length) cur = fromHash;
+
+const root = document.documentElement;
+document.getElementById('theme').onclick = () => {
+  root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+  render();   // SVG는 currentColor를 안 쓰는 자리가 있어 재렌더
+};
+
+render();
+</script>
+</body>
+</html>

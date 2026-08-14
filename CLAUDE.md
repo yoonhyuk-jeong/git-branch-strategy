@@ -5,7 +5,7 @@
 **IMT Git Branch 전략 v4 검증용 샌드박스.** 제품 코드가 아니다. 브랜치/merge/배포 플로우와
 `.claude/` 도구(skill + `/imt-*` 커맨드)를 실제로 돌려보고 부수기 위한 곳이다.
 
-- 규칙 원본(단일 진실): `claude-help/workflow/GIT_BRANCH_STRATEGY_V4_DRAFT.md`
+- 규칙 원본(단일 진실): [Confluence — IMT Git Branch 전략 v4](https://trialinformatics.atlassian.net/wiki/spaces/ImageTrial/pages/716800002) (확정 2026-08-14). **로컬 사본을 두지 않는다**
 - 검증 시나리오 체크리스트: `TESTING_V4.md`
 - 브랜치/merge/배포 작업은 **`imt-git-flow` 스킬 규칙을 따른다** (자동 참고됨)
 
