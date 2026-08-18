@@ -14,6 +14,13 @@
     --good:#0ca30c; --warn:#fab219; --crit:#d03b3b;
     --code-bg:#f2f1ec;
     --env1:#a3a19b; --env2:#7d7b76; --env3:#52514e; --env4:#0b0b0b;
+    --bg-tag:#f2f1ec; --bd-tag:#d6d4cd; --fg-tag:#52514e;
+    --bg-ok:#e7f5e7;  --bd-ok:#b7e0b7;  --fg-ok:#046a04;
+    --bg-warn:#fdf1d8;--bd-warn:#f2d089;--fg-warn:#8a5c00;
+    --bg-env:#eeedea; --bd-env:#d6d4cd; --fg-env:#52514e;
+    --bg-uat:#fdece3; --bd-uat:#f4c5a9; --fg-uat:#a1400f;
+    --bg-prod:#0b0b0b;--bd-prod:#0b0b0b;--fg-prod:#ffffff;
+    --bg-dim:#f2f1ec; --bd-dim:#e1e0d9; --fg-dim:#898781;
   }
   :root[data-theme="dark"]{
     color-scheme: dark;
@@ -24,6 +31,13 @@
     --good:#0ca30c; --warn:#fab219; --crit:#d03b3b;
     --code-bg:#242422;
     --env1:#575652; --env2:#898781; --env3:#b8b6ae; --env4:#ffffff;
+    --bg-tag:#2a2a27; --bd-tag:#3d3d39; --fg-tag:#c3c2b7;
+    --bg-ok:#12331a;  --bd-ok:#1e5c2c;  --fg-ok:#5fd06a;
+    --bg-warn:#3a2e10;--bd-warn:#6e5615;--fg-warn:#f0bb45;
+    --bg-env:#2a2a27; --bd-env:#3d3d39; --fg-env:#c3c2b7;
+    --bg-uat:#3a2013; --bd-uat:#6e3a1d; --fg-uat:#eb9a6c;
+    --bg-prod:#ffffff;--bd-prod:#ffffff;--fg-prod:#0b0b0b;
+    --bg-dim:#242422; --bd-dim:#33332f; --fg-dim:#898781;
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
@@ -34,6 +48,13 @@
       --featA:#3987e5; --featB:#d95926; --featC:#199e70;
       --code-bg:#242422;
       --env1:#575652; --env2:#898781; --env3:#b8b6ae; --env4:#ffffff;
+    --bg-tag:#2a2a27; --bd-tag:#3d3d39; --fg-tag:#c3c2b7;
+    --bg-ok:#12331a;  --bd-ok:#1e5c2c;  --fg-ok:#5fd06a;
+    --bg-warn:#3a2e10;--bd-warn:#6e5615;--fg-warn:#f0bb45;
+    --bg-env:#2a2a27; --bd-env:#3d3d39; --fg-env:#c3c2b7;
+    --bg-uat:#3a2013; --bd-uat:#6e3a1d; --fg-uat:#eb9a6c;
+    --bg-prod:#ffffff;--bd-prod:#ffffff;--fg-prod:#0b0b0b;
+    --bg-dim:#242422; --bd-dim:#33332f; --fg-dim:#898781;
     }
   }
   *{box-sizing:border-box}
@@ -127,6 +148,17 @@
   .note strong{color:var(--ink)}
 
   .graph-legend{display:flex;gap:18px;flex-wrap:wrap;margin:10px 0 14px;font-size:12.5px;color:var(--ink-2)}
+  .gwrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+         padding:6px 4px 10px;overflow-x:auto}
+  .gwrap svg{min-width:940px;display:block}
+  details.raw{margin-top:14px}
+  details.raw summary{cursor:pointer;font-size:13px;color:var(--ink-2);
+    background:var(--surface);border:1px solid var(--border);border-radius:9px;
+    padding:9px 14px;list-style:none;user-select:none}
+  details.raw summary::-webkit-details-marker{display:none}
+  details.raw summary::before{content:"▸ ";color:var(--muted)}
+  details.raw[open] summary::before{content:"▾ "}
+  details.raw pre{margin-top:10px}
   .graph-legend span{display:inline-flex;align-items:center;gap:7px}
 
   footer{padding:34px 0;color:var(--muted);font-size:12.5px}
@@ -273,13 +305,195 @@
 <section>
   <div class="num">03</div>
   <h2>실제 커밋 그래프</h2>
-  <p>아래는 <code>git log --graph</code> 원문이다. 가공하지 않았다.</p>
+  <p>위에서 아래로 시간이 흐른다. 왼쪽 8개 레인이 브랜치, 동그라미가 커밋이다.
+     <strong>속이 빈 동그라미는 merge commit</strong>이고, 선 색은 어느 기능이 합류했는지를 나타낸다.</p>
   <div class="graph-legend">
-    <span><span class="swatch" style="background:var(--featA)"></span>4001 audit-log</span>
-    <span><span class="swatch" style="background:var(--featB)"></span>4002 export-csv</span>
-    <span><span class="swatch" style="background:var(--featC)"></span>4003 null-guard</span>
+    <span><span class="swatch" style="background:var(--featA)"></span>IMTDEV-4001 audit-log</span>
+    <span><span class="swatch" style="background:var(--featB)"></span>IMTDEV-4002 export-csv</span>
+    <span><span class="swatch" style="background:var(--featC)"></span>IMTDEV-4003 null-guard</span>
+    <span><span class="swatch" style="background:var(--ink)"></span>master</span><span style="color:var(--muted)">○ 테두리 색 = 이 merge로 합류한 기능</span>
   </div>
-<pre id="graph">*   298c853 (origin/dev, dev) Merge branch 'master' into dev
+  <div class="gwrap">
+<svg viewBox="0 0 1000 704" width="100%" role="img" aria-label="0818 사이클 커밋 그래프" xmlns="http://www.w3.org/2000/svg">
+<style>.gsha{font-size:11.5px;fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}.gmsg{font-size:12.5px;fill:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Noto Sans KR",sans-serif}.glane{font-size:10.5px;fill:var(--ink-2);font-family:ui-monospace,Menlo,Consolas,monospace}.gbadge{font-size:10px;font-weight:600;font-family:system-ui,-apple-system,"Segoe UI","Noto Sans KR",sans-serif}.grow .ghl{fill:transparent}.grow:hover .ghl{fill:var(--surface-2)}</style>
+<line x1="37" y1="112" x2="37" y2="588" stroke="var(--grid)" stroke-width="1"/>
+<text class="glane" transform="translate(40,80) rotate(-50)">master</text>
+<line x1="67" y1="146" x2="67" y2="146" stroke="var(--grid)" stroke-width="1"/>
+<text class="glane" transform="translate(70,80) rotate(-50)">4001</text>
+<line x1="97" y1="180" x2="97" y2="180" stroke="var(--grid)" stroke-width="1"/>
+<text class="glane" transform="translate(100,80) rotate(-50)">4002</text>
+<line x1="127" y1="214" x2="127" y2="214" stroke="var(--grid)" stroke-width="1"/>
+<text class="glane" transform="translate(130,80) rotate(-50)">4003</text>
+<line x1="157" y1="248" x2="157" y2="656" stroke="var(--grid)" stroke-width="1"/>
+<text class="glane" transform="translate(160,80) rotate(-50)">dev</text>
+<line x1="187" y1="316" x2="187" y2="622" stroke="var(--grid)" stroke-width="1"/>
+<text class="glane" transform="translate(190,80) rotate(-50)">test</text>
+<line x1="217" y1="418" x2="217" y2="452" stroke="var(--grid)" stroke-width="1"/>
+<text class="glane" transform="translate(220,80) rotate(-50)">release</text>
+<line x1="247" y1="486" x2="247" y2="520" stroke="var(--grid)" stroke-width="1"/>
+<text class="glane" transform="translate(250,80) rotate(-50)">assemble</text>
+<path d="M37,112 L37,119 C37,128 67,128 67,137 L67,146" stroke="var(--line)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M37,112 L37,119 C37,128 97,128 97,137 L97,180" stroke="var(--line)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M37,112 L37,119 C37,128 127,128 127,137 L127,214" stroke="var(--line)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M37,112 L37,119 C37,128 157,128 157,137 L157,248" stroke="var(--line)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M67,146 L67,223 C67,232 157,232 157,241 L157,248" stroke="var(--featA)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M157,248 L157,282" stroke="var(--muted)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M127,214 L127,257 C127,266 157,266 157,275 L157,282" stroke="var(--featC)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M37,112 L37,119 C37,128 187,128 187,137 L187,316" stroke="var(--line)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M67,146 L67,291 C67,300 187,300 187,309 L187,316" stroke="var(--featA)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M187,316 L187,350" stroke="var(--muted)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M97,180 L97,325 C97,334 187,334 187,343 L187,350" stroke="var(--featB)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M187,350 L187,384" stroke="var(--muted)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M127,214 L127,359 C127,368 187,368 187,377 L187,384" stroke="var(--featC)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M37,112 L37,119 C37,128 217,128 217,137 L217,418" stroke="var(--line)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M67,146 L67,393 C67,402 217,402 217,411 L217,418" stroke="var(--featA)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M217,418 L217,452" stroke="var(--muted)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M97,180 L97,427 C97,436 217,436 217,445 L217,452" stroke="var(--featB)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M37,112 L37,119 C37,128 247,128 247,137 L247,486" stroke="var(--line)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M67,146 L67,461 C67,470 247,470 247,479 L247,486" stroke="var(--featA)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M247,486 L247,520" stroke="var(--muted)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M97,180 L97,495 C97,504 247,504 247,513 L247,520" stroke="var(--featB)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M37,112 L37,554" stroke="var(--ink)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M247,520 L247,529 C247,538 37,538 37,547 L37,554" stroke="var(--ink)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M37,554 L37,588" stroke="var(--ink)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M187,384 L187,622" stroke="var(--muted)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M37,588 L37,597 C37,606 187,606 187,615 L187,622" stroke="var(--ink)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M157,282 L157,656" stroke="var(--muted)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M37,588 L37,631 C37,640 157,640 157,649 L157,656" stroke="var(--ink)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<g class="grow">
+<rect class="ghl" x="4" y="96" width="992" height="32" rx="7"/>
+<circle cx="37" cy="112" r="5.5" fill="var(--ink)" stroke="var(--surface)" stroke-width="2"/>
+<text class="gsha" x="288" y="116">fdcac52</text>
+<text class="gmsg" x="358" y="116">버전/digest 추적 파이프라인 도입</text>
+<rect x="578" y="103" width="55" height="18" rx="9" fill="var(--bg-tag)" stroke="var(--bd-tag)" stroke-width="1"/>
+<text class="gbadge" x="606" y="116" text-anchor="middle" fill="var(--fg-tag)">v1.0.0</text>
+</g>
+<g class="grow">
+<rect class="ghl" x="4" y="130" width="992" height="32" rx="7"/>
+<circle cx="67" cy="146" r="5.5" fill="var(--featA)" stroke="var(--surface)" stroke-width="2"/>
+<text class="gsha" x="288" y="150">d68e5f8</text>
+<text class="gmsg" x="358" y="150">feat: IMTDEV-4001 감사 로그 기록</text>
+</g>
+<g class="grow">
+<rect class="ghl" x="4" y="164" width="992" height="32" rx="7"/>
+<circle cx="97" cy="180" r="5.5" fill="var(--featB)" stroke="var(--surface)" stroke-width="2"/>
+<text class="gsha" x="288" y="184">5da353d</text>
+<text class="gmsg" x="358" y="184">feat: IMTDEV-4002 CSV 내보내기</text>
+</g>
+<g class="grow">
+<rect class="ghl" x="4" y="198" width="992" height="32" rx="7"/>
+<circle cx="127" cy="214" r="5.5" fill="var(--featC)" stroke="var(--surface)" stroke-width="2"/>
+<text class="gsha" x="288" y="218">6afcd66</text>
+<text class="gmsg" x="358" y="218">fix: IMTDEV-4003 Visit null 방어</text>
+</g>
+<g class="grow">
+<rect class="ghl" x="4" y="232" width="992" height="32" rx="7"/>
+<circle cx="157" cy="248" r="7.5" fill="var(--surface)" stroke="var(--featA)" stroke-width="3"/>
+<text class="gsha" x="288" y="252">9720cde</text>
+<text class="gmsg" x="358" y="252">dev ← 4001</text>
+</g>
+<g class="grow">
+<rect class="ghl" x="4" y="266" width="992" height="32" rx="7"/>
+<circle cx="157" cy="282" r="7.5" fill="var(--surface)" stroke="var(--featC)" stroke-width="3"/>
+<text class="gsha" x="288" y="286">9ed2e21</text>
+<text class="gmsg" x="358" y="286">dev ← 4003</text>
+<rect x="578" y="273" width="64" height="18" rx="9" fill="var(--bg-env)" stroke="var(--bd-env)" stroke-width="1"/>
+<text class="gbadge" x="610" y="286" text-anchor="middle" fill="var(--fg-env)">DEV 배포</text>
+</g>
+<g class="grow">
+<rect class="ghl" x="4" y="300" width="992" height="32" rx="7"/>
+<circle cx="187" cy="316" r="7.5" fill="var(--surface)" stroke="var(--featA)" stroke-width="3"/>
+<text class="gsha" x="288" y="320">41dc2ad</text>
+<text class="gmsg" x="358" y="320">test ← 4001 · PR #5</text>
+</g>
+<g class="grow">
+<rect class="ghl" x="4" y="334" width="992" height="32" rx="7"/>
+<circle cx="187" cy="350" r="7.5" fill="var(--surface)" stroke="var(--featB)" stroke-width="3"/>
+<text class="gsha" x="288" y="354">462102e</text>
+<text class="gmsg" x="358" y="354">test ← 4002 · PR #6</text>
+<rect x="578" y="341" width="111" height="18" rx="9" fill="var(--bg-warn)" stroke="var(--bd-warn)" stroke-width="1"/>
+<text class="gbadge" x="634" y="354" text-anchor="middle" fill="var(--fg-warn)">충돌 — 로컬 해결</text>
+</g>
+<g class="grow">
+<rect class="ghl" x="4" y="368" width="992" height="32" rx="7"/>
+<circle cx="187" cy="384" r="7.5" fill="var(--surface)" stroke="var(--featC)" stroke-width="3"/>
+<text class="gsha" x="288" y="388">b7efaeb</text>
+<text class="gmsg" x="358" y="388">test ← 4003 · PR #7</text>
+<rect x="578" y="375" width="70" height="18" rx="9" fill="var(--bg-env)" stroke="var(--bd-env)" stroke-width="1"/>
+<text class="gbadge" x="613" y="388" text-anchor="middle" fill="var(--fg-env)">TEST 배포</text>
+</g>
+<g class="grow">
+<rect class="ghl" x="4" y="402" width="992" height="32" rx="7"/>
+<circle cx="217" cy="418" r="7.5" fill="var(--surface)" stroke="var(--featA)" stroke-width="3"/>
+<text class="gsha" x="288" y="422">dbc6141</text>
+<text class="gmsg" x="358" y="422">release-0818 ← 4001</text>
+</g>
+<g class="grow">
+<rect class="ghl" x="4" y="436" width="992" height="32" rx="7"/>
+<circle cx="217" cy="452" r="7.5" fill="var(--surface)" stroke="var(--featB)" stroke-width="3"/>
+<text class="gsha" x="288" y="456">b5f30b6</text>
+<text class="gmsg" x="358" y="456">release-0818 ← 4002</text>
+<rect x="578" y="443" width="83" height="18" rx="9" fill="var(--bg-ok)" stroke="var(--bd-ok)" stroke-width="1"/>
+<text class="gbadge" x="619" y="456" text-anchor="middle" fill="var(--fg-ok)">rerere 자동</text>
+<rect x="668" y="443" width="64" height="18" rx="9" fill="var(--bg-uat)" stroke="var(--bd-uat)" stroke-width="1"/>
+<text class="gbadge" x="700" y="456" text-anchor="middle" fill="var(--fg-uat)">UAT 배포</text>
+<rect x="739" y="443" width="111" height="18" rx="9" fill="var(--bg-tag)" stroke="var(--bd-tag)" stroke-width="1"/>
+<text class="gbadge" x="794" y="456" text-anchor="middle" fill="var(--fg-tag)">uat-v1.1.0-rc.1</text>
+</g>
+<g class="grow">
+<rect class="ghl" x="4" y="470" width="992" height="32" rx="7"/>
+<circle cx="247" cy="486" r="7.5" fill="var(--surface)" stroke="var(--featA)" stroke-width="3"/>
+<text class="gsha" x="288" y="490">d610bf5</text>
+<text class="gmsg" x="358" y="490">assemble/0818 ← 4001</text>
+</g>
+<g class="grow">
+<rect class="ghl" x="4" y="504" width="992" height="32" rx="7"/>
+<circle cx="247" cy="520" r="7.5" fill="var(--surface)" stroke="var(--featB)" stroke-width="3"/>
+<text class="gsha" x="288" y="524">3353f32</text>
+<text class="gmsg" x="358" y="524">assemble/0818 ← 4002</text>
+<rect x="578" y="511" width="83" height="18" rx="9" fill="var(--bg-ok)" stroke="var(--bd-ok)" stroke-width="1"/>
+<text class="gbadge" x="619" y="524" text-anchor="middle" fill="var(--fg-ok)">rerere 자동</text>
+<rect x="668" y="511" width="95" height="18" rx="9" fill="var(--bg-ok)" stroke="var(--bd-ok)" stroke-width="1"/>
+<text class="gbadge" x="715" y="524" text-anchor="middle" fill="var(--fg-ok)">tree SHA 일치</text>
+</g>
+<g class="grow">
+<rect class="ghl" x="4" y="538" width="992" height="32" rx="7"/>
+<circle cx="37" cy="554" r="7.5" fill="var(--surface)" stroke="var(--ink)" stroke-width="3"/>
+<text class="gsha" x="288" y="558">9db50e8</text>
+<text class="gmsg" x="358" y="558">Release 0818 (#8)</text>
+<rect x="578" y="545" width="70" height="18" rx="9" fill="var(--bg-prod)" stroke="var(--bd-prod)" stroke-width="1"/>
+<text class="gbadge" x="613" y="558" text-anchor="middle" fill="var(--fg-prod)">PROD 배포</text>
+<rect x="655" y="545" width="55" height="18" rx="9" fill="var(--bg-tag)" stroke="var(--bd-tag)" stroke-width="1"/>
+<text class="gbadge" x="683" y="558" text-anchor="middle" fill="var(--fg-tag)">v1.1.0</text>
+<rect x="718" y="545" width="116" height="18" rx="9" fill="var(--bg-ok)" stroke="var(--bd-ok)" stroke-width="1"/>
+<text class="gbadge" x="775" y="558" text-anchor="middle" fill="var(--fg-ok)">이 커밋이 빌드된다</text>
+</g>
+<g class="grow">
+<rect class="ghl" x="4" y="572" width="992" height="32" rx="7"/>
+<circle cx="37" cy="588" r="5.5" fill="var(--ink)" stroke="var(--surface)" stroke-width="2"/>
+<text class="gsha" x="288" y="592">fb7f22a</text>
+<text class="gmsg" x="358" y="592">chore(release): v1.1.0 [skip ci]</text>
+<rect x="578" y="579" width="117" height="18" rx="9" fill="var(--bg-dim)" stroke="var(--bd-dim)" stroke-width="1"/>
+<text class="gbadge" x="637" y="592" text-anchor="middle" fill="var(--fg-dim)">뒤처리 · 산출물 밖</text>
+</g>
+<g class="grow">
+<rect class="ghl" x="4" y="606" width="992" height="32" rx="7"/>
+<circle cx="187" cy="622" r="7.5" fill="var(--surface)" stroke="var(--ink)" stroke-width="3"/>
+<text class="gsha" x="288" y="626">94be8ff</text>
+<text class="gmsg" x="358" y="626">test ← master · forward merge</text>
+</g>
+<g class="grow">
+<rect class="ghl" x="4" y="640" width="992" height="32" rx="7"/>
+<circle cx="157" cy="656" r="7.5" fill="var(--surface)" stroke="var(--ink)" stroke-width="3"/>
+<text class="gsha" x="288" y="660">298c853</text>
+<text class="gmsg" x="358" y="660">dev ← master · forward merge</text>
+</g>
+</svg>
+  </div>
+
+  <details class="raw">
+    <summary><code>git log --graph</code> 원문 보기 (위 그래프의 출처)</summary>
+<pre id="rawgraph">*   298c853 (origin/dev, dev) Merge branch 'master' into dev
 |\
 * \   9ed2e21 Merge branch '0818/YH/IMTDEV-4003-visit-null-guard' into dev
 |\ \
@@ -319,6 +533,7 @@
 | * d68e5f8 feat: IMTDEV-4001 감사 로그 기록 추가
 |/
 * fdcac52 (tag: v1.0.0) build: version.yml 단일 소스 + 버전/digest 추적 파이프라인 도입</pre>
+  </details>
 
   <div class="note">
     <strong>master 끝부분의 두 줄이 핵심이다.</strong>
@@ -483,7 +698,8 @@ assemble/0818 e96b241c3a0e6a2c...
     [/(IMTDEV-4002[^\s]*|export-csv)/g, 'featB'],
     [/(IMTDEV-4003[^\s]*|null-guard|visit-null-guard)/g, 'featC']
   ];
-  var pre = document.getElementById('graph');
+  var pre = document.getElementById('rawgraph');
+  if (!pre) return;
   var html = pre.textContent
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   map.forEach(function(m){
