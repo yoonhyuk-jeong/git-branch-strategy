@@ -1,4 +1,4 @@
 # 버전 단일 소스(single source of truth).
 # prod 배포 시 conventional-changelog-action 이 이 파일을 갱신하고 chore(release) 커밋으로 남긴다.
 # 사람이 직접 고치지 않는다.
-version: 1.0.0
+version: 1.1.0
