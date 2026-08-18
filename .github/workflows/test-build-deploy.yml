@@ -1,6 +1,9 @@
 # v4 12절: test = workflow_dispatch (소스: test 브랜치)
 # QA가 검증 시작 시점을 통제한다 — 검증 중 다른 기능이 test에 merge돼도 환경이 덮어써지지 않는다.
-# 샌드박스용 더미 — 실제 배포 없이 build + 태그 출력만 한다.
+# 샌드박스용 더미 — 실제 배포 없이 build + 산출물 식별자 출력만 한다.
+#
+# 버전 규칙은 dev 와 동일: test 에는 릴리스 버전을 발급하지 않는다.
+# QA가 봐야 할 것은 "몇 버전이냐"가 아니라 "무슨 기능이 올라와 있느냐"다 (v4 브랜치=칸반).
 name: Test dispatch build & Deploy (dummy)
 
 on:
@@ -36,18 +39,49 @@ jobs:
       - name: Build
         run: ./gradlew build --no-daemon
 
-      - name: Deploy (dummy)
+      - name: 산출물 digest 산출
+        id: artifact
         run: |
-          VERSION=$(grep -oP 'CURRENT = "\K[^"]+' src/main/java/com/ti/Version.java)
-          echo "::notice title=TEST deploy::env=test ref=${GITHUB_REF_NAME} image=ti-server:v${VERSION} / ti-server:sha-${GITHUB_SHA::7}"
+          JAR=$(ls build/libs/*.jar | head -1)
+          echo "digest=sha256:$(sha256sum "$JAR" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy (dummy) — 주입 실행
+        env:
+          APP_ENV: test
+          APP_VERSION: sha-${{ github.sha }}
+          APP_COMMIT: ${{ github.sha }}
+          APP_DIGEST: ${{ steps.artifact.outputs.digest }}
+        run: |
           {
-            echo "## 🟡 TEST 배포 (dummy) — QA 게이트"
-            echo "- 트리거: \`workflow_dispatch\` (QA가 시점 통제)"
-            echo "- 소스 브랜치: \`${GITHUB_REF_NAME}\`"
-            echo "- 이미지 태그: \`ti-server:v${VERSION}\` / \`ti-server:sha-${GITHUB_SHA::7}\`"
+            echo 'APP_OUTPUT<<__EOF__'
+            java -cp build/classes/java/main:build/resources/main com.ti.Main
+            echo '__EOF__'
+          } >> "$GITHUB_ENV"
+
+      - name: Step summary
+        env:
+          DIGEST: ${{ steps.artifact.outputs.digest }}
+        run: |
+          echo "::notice title=TEST deploy::env=test ref=${GITHUB_REF_NAME} image=ti-server:sha-${GITHUB_SHA::7} digest=${DIGEST}"
+          {
+            echo "## 🟡 TEST 배포 (dummy) — QA 게이트 + 배포 대기실"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| 트리거 | \`workflow_dispatch\` (QA가 시점 통제) |"
+            echo "| 소스 브랜치 | \`${GITHUB_REF_NAME}\` |"
+            echo "| 이미지 태그 | \`ti-server:sha-${GITHUB_SHA::7}\` — **버전 없음** (릴리스 대상이 아니다) |"
+            echo "| digest | \`${DIGEST}\` |"
+            echo "| 커밋 | [\`${GITHUB_SHA:0:7}\`](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}) |"
+            echo ""
+            echo "### 실행 중인 앱"
+            echo '```'
+            echo "${APP_OUTPUT}"
+            echo '```'
             echo ""
             echo "### 이 배포에 들어있는 기능 (master 대비)"
             echo '```'
             git log --merges --oneline "${GITHUB_SHA}" --not origin/master || echo "(master 대비 추가 merge 없음)"
             echo '```'
+            echo "> QA 통과해도 배포일이 미정이면 여기 머문다. 배포 확정분만 \`release-{MMDD}\` 로 간다."
           } >> "$GITHUB_STEP_SUMMARY"
