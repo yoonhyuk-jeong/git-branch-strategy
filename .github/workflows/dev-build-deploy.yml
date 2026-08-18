@@ -33,6 +33,21 @@ jobs:
           distribution: 'corretto'
           cache: 'gradle'
 
+      # ── 빌드 환경 기록 ────────────────────────────────────────────────
+      # JDK 를 고정하지 않는다. `java-version: '17'` 은 최신 패치로 해석되므로 실행 시점마다
+      # 달라질 수 있고, 그건 CVE 패치를 계속 받기 위해 의도한 것이다.
+      # 대신 무엇으로 빌드했는지를 남긴다 — digest 가 어긋났을 때 "JDK가 움직였나 / 소스가
+      # 다른가"를 즉시 구분하기 위한 증적이다. 고정(prevention)이 아니라 감지(detection).
+      - name: 빌드 환경 기록
+        id: buildenv
+        run: |
+          VENDOR=$(java -XshowSettings:properties -version 2>&1 | grep -m1 'java.vendor =' | sed 's/.*= *//')
+          BUILD=$(java -version 2>&1 | sed -n '2p' | sed -E 's/.*\(build ([^)]*)\).*/\1/')
+          GRADLE=$(sed -n 's|.*gradle-\([0-9.]*\)-bin.zip|\1|p' gradle/wrapper/gradle-wrapper.properties)
+          echo "jdk=${VENDOR} ${BUILD}" >> "$GITHUB_OUTPUT"
+          echo "gradle=${GRADLE}"       >> "$GITHUB_OUTPUT"
+          echo "JDK: ${VENDOR} ${BUILD} / Gradle: ${GRADLE}"
+
       - name: Build
         run: ./gradlew build --no-daemon
 
@@ -58,6 +73,7 @@ jobs:
       - name: Step summary
         env:
           DIGEST: ${{ steps.artifact.outputs.digest }}
+          JDK: ${{ steps.buildenv.outputs.jdk }}
         run: |
           echo "::notice title=DEV deploy::env=dev ref=${GITHUB_REF_NAME} image=ti-server:sha-${GITHUB_SHA::7} digest=${DIGEST}"
           {
@@ -69,6 +85,7 @@ jobs:
             echo "| 이미지 태그 | \`ti-server:sha-${GITHUB_SHA::7}\` — **버전 없음** (dev/test는 릴리스 대상이 아니다) |"
             echo "| digest | \`${DIGEST}\` |"
             echo "| 커밋 | [\`${GITHUB_SHA:0:7}\`](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}) |"
+            echo "| 빌드 JDK | \`${JDK}\` |"
             echo ""
             echo "### 실행 중인 앱"
             echo '```'
