@@ -103,6 +103,21 @@ jobs:
           distribution: 'corretto'
           cache: 'gradle'
 
+      # ── 빌드 환경 기록 ────────────────────────────────────────────────
+      # JDK 를 고정하지 않는다. `java-version: '17'` 은 최신 패치로 해석되므로 실행 시점마다
+      # 달라질 수 있고, 그건 CVE 패치를 계속 받기 위해 의도한 것이다.
+      # 대신 무엇으로 빌드했는지를 남긴다 — digest 가 어긋났을 때 "JDK가 움직였나 / 소스가
+      # 다른가"를 즉시 구분하기 위한 증적이다. 고정(prevention)이 아니라 감지(detection).
+      - name: 빌드 환경 기록
+        id: buildenv
+        run: |
+          VENDOR=$(java -XshowSettings:properties -version 2>&1 | grep -m1 'java.vendor =' | sed 's/.*= *//')
+          BUILD=$(java -version 2>&1 | sed -n '2p' | sed -E 's/.*\(build ([^)]*)\).*/\1/')
+          GRADLE=$(sed -n 's|.*gradle-\([0-9.]*\)-bin.zip|\1|p' gradle/wrapper/gradle-wrapper.properties)
+          echo "jdk=${VENDOR} ${BUILD}" >> "$GITHUB_OUTPUT"
+          echo "gradle=${GRADLE}"       >> "$GITHUB_OUTPUT"
+          echo "JDK: ${VENDOR} ${BUILD} / Gradle: ${GRADLE}"
+
       - name: Build
         run: ./gradlew build --no-daemon
 
@@ -127,6 +142,8 @@ jobs:
           VERSION: ${{ steps.rc.outputs.version }}
           IMAGE_TAG: ${{ steps.rc.outputs.image_tag }}
           DIGEST: ${{ steps.artifact.outputs.digest }}
+          JDK: ${{ steps.buildenv.outputs.jdk }}
+          GRADLE: ${{ steps.buildenv.outputs.gradle }}
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -139,6 +156,8 @@ jobs:
           commit   : ${GITHUB_SHA}
           image    : ti-server:${IMAGE_TAG}
           digest   : ${DIGEST}
+          jdk      : ${JDK}
+          gradle   : ${GRADLE}
           run      : ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
           by       : ${GITHUB_ACTOR}
 
@@ -171,6 +190,8 @@ jobs:
           VERSION: ${{ steps.rc.outputs.version }}
           IMAGE_TAG: ${{ steps.rc.outputs.image_tag }}
           DIGEST: ${{ steps.artifact.outputs.digest }}
+          JDK: ${{ steps.buildenv.outputs.jdk }}
+          GRADLE: ${{ steps.buildenv.outputs.gradle }}
         run: |
           {
             echo "## 🟠 UAT 배포 (dummy) — \`${VERSION}\` 후보"
@@ -184,6 +205,8 @@ jobs:
             echo "| 소스 브랜치 | \`${GITHUB_REF_NAME}\` |"
             echo "| 커밋 | [\`${GITHUB_SHA:0:7}\`](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}) |"
             echo "| 배포자 | @${GITHUB_ACTOR} |"
+            echo "| 빌드 JDK | \`${JDK}\` ← **고정하지 않는다.** prod 와 다르면 digest 불일치의 원인 후보 |"
+            echo "| Gradle | \`${GRADLE}\` |"
             echo ""
             echo "### 실행 중인 앱이 스스로 답하는 값"
             echo "> 실제 레포의 \`/actuator/info\` 에 해당. 버전은 굽지 않고 주입되므로 산출물은 그대로다."

@@ -145,6 +145,21 @@ jobs:
           distribution: 'corretto'
           cache: 'gradle'
 
+      # ── 빌드 환경 기록 ────────────────────────────────────────────────
+      # JDK 를 고정하지 않는다. `java-version: '17'` 은 최신 패치로 해석되므로 실행 시점마다
+      # 달라질 수 있고, 그건 CVE 패치를 계속 받기 위해 의도한 것이다.
+      # 대신 무엇으로 빌드했는지를 남긴다 — digest 가 어긋났을 때 "JDK가 움직였나 / 소스가
+      # 다른가"를 즉시 구분하기 위한 증적이다. 고정(prevention)이 아니라 감지(detection).
+      - name: 빌드 환경 기록
+        id: buildenv
+        run: |
+          VENDOR=$(java -XshowSettings:properties -version 2>&1 | grep -m1 'java.vendor =' | sed 's/.*= *//')
+          BUILD=$(java -version 2>&1 | sed -n '2p' | sed -E 's/.*\(build ([^)]*)\).*/\1/')
+          GRADLE=$(sed -n 's|.*gradle-\([0-9.]*\)-bin.zip|\1|p' gradle/wrapper/gradle-wrapper.properties)
+          echo "jdk=${VENDOR} ${BUILD}" >> "$GITHUB_OUTPUT"
+          echo "gradle=${GRADLE}"       >> "$GITHUB_OUTPUT"
+          echo "JDK: ${VENDOR} ${BUILD} / Gradle: ${GRADLE}"
+
       - name: Build
         run: ./gradlew build --no-daemon
 
@@ -158,27 +173,38 @@ jobs:
 
       # ★ 목표의 핵심 ★ — "UAT에서 검증한 그 산출물이 그대로 나갔는가"를 digest로 증명한다.
       # uat-v* 태그의 메시지에 digest가 적혀 있으므로, 그걸 훑어 같은 값을 찾는다.
-      - name: UAT 대조 (버전 예보 / digest 동일성)
+      # ★ 목표의 핵심 ★ — "UAT에서 검증한 그 산출물이 그대로 나갔는가"를 digest로 증명한다.
+      # uat-v* 태그의 메시지에 digest/jdk/commit 이 적혀 있으므로, 그걸 훑어 대조한다.
+      # 어긋났을 때는 기록해 둔 값들을 비교해 **무엇이 움직였는지**까지 지목한다.
+      - name: UAT 대조 (digest 동일성 / 불일치 원인 진단)
         id: verify
         env:
           DIGEST: ${{ steps.artifact.outputs.digest }}
           VERSION: ${{ needs.release.outputs.version }}
+          BUILD_SHA: ${{ needs.release.outputs.build_sha }}
+          JDK: ${{ steps.buildenv.outputs.jdk }}
         run: |
           git fetch --tags --force --quiet
           git tag -l 'uat-v*' > /tmp/uat_tags.txt || true
+
+          # annotated 태그 메시지에서 "키 : 값" 한 줄 뽑기
+          field() { git for-each-ref --format='%(contents)' "refs/tags/$1" \
+                     | sed -n "s/^$2[[:space:]]*:[[:space:]]*//p" | head -1; }
 
           MATCH=""
           # 파이프 대신 파일 리다이렉션 — 파이프면 while이 서브셸에서 돌아 MATCH가 사라진다
           while IFS= read -r t; do
             [ -n "$t" ] || continue
-            d=$(git for-each-ref --format='%(contents)' "refs/tags/$t" | sed -n 's/^digest[[:space:]]*:[[:space:]]*//p')
-            if [ "$d" = "$DIGEST" ]; then MATCH="$t"; break; fi
+            if [ "$(field "$t" digest)" = "$DIGEST" ]; then MATCH="$t"; break; fi
           done < /tmp/uat_tags.txt
+
+          # 같은 버전으로 UAT에 올렸던 가장 최근 rc — digest가 어긋났을 때의 비교 대상
+          CAND=$(git tag -l "uat-v${VERSION}-rc.*" --sort=-creatordate | head -1)
 
           if [ -n "$MATCH" ]; then
             FORECAST=$(echo "$MATCH" | sed -E 's|^uat-v(.*)-rc\.[0-9]+$|\1|')
-            echo "matched_tag=$MATCH"        >> "$GITHUB_OUTPUT"
-            echo "forecast=$FORECAST"        >> "$GITHUB_OUTPUT"
+            echo "matched_tag=$MATCH" >> "$GITHUB_OUTPUT"
+            echo "cause="             >> "$GITHUB_OUTPUT"
             echo "✅ digest 일치 — UAT($MATCH)에서 검증한 산출물이 그대로 나간다"
             if [ -n "$VERSION" ] && [ "$FORECAST" != "$VERSION" ]; then
               echo "::warning title=버전 예보 불일치::UAT는 $FORECAST 로 예보했으나 실제 발급은 $VERSION 입니다. 재조립으로 배포 범위가 바뀐 것으로 보입니다."
@@ -187,9 +213,28 @@ jobs:
               echo "version_match=true"  >> "$GITHUB_OUTPUT"
             fi
           else
-            echo "matched_tag="      >> "$GITHUB_OUTPUT"
-            echo "version_match=na"  >> "$GITHUB_OUTPUT"
-            echo "::warning title=UAT 대조 실패::이 digest($DIGEST)와 같은 uat-v* 태그가 없습니다. UAT를 거치지 않았거나(v4 금지규칙 7), 조립 이후 소스가 바뀐 것입니다."
+            echo "matched_tag="     >> "$GITHUB_OUTPUT"
+            echo "version_match=na" >> "$GITHUB_OUTPUT"
+            CAUSE=""
+            if [ -n "$CAND" ]; then
+              U_JDK=$(field "$CAND" jdk)
+              U_TREE=$(git rev-parse "${CAND}^{tree}" 2>/dev/null || echo "")
+              P_TREE=$(git rev-parse "${BUILD_SHA}^{tree}")
+              # 기록해 둔 값들을 하나씩 대조해 원인을 좁힌다 (고정 대신 감지를 택한 이유)
+              if [ -n "$U_TREE" ] && [ "$U_TREE" != "$P_TREE" ]; then
+                CAUSE="소스 트리가 다르다 (UAT ${U_TREE:0:12} vs PROD ${P_TREE:0:12}) — 조립 이후 코드가 바뀌었다"
+              elif [ -n "$U_JDK" ] && [ "$U_JDK" != "$JDK" ]; then
+                CAUSE="빌드 JDK가 움직였다 (UAT: $U_JDK / PROD: $JDK) — 소스는 동일"
+              else
+                CAUSE="기록된 입력(트리·JDK)은 모두 같다 — 기록하지 않은 변수가 움직였다"
+              fi
+              echo "::warning title=digest 불일치::$CAND 와 산출물이 다릅니다. 원인: $CAUSE"
+            else
+              CAUSE="이 버전으로 UAT에 올린 기록이 없다 — UAT 미경유 (v4 금지규칙 7)"
+              echo "::warning title=UAT 기록 없음::$CAUSE"
+            fi
+            echo "cause=$CAUSE" >> "$GITHUB_OUTPUT"
+            echo "candidate=$CAND" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Deploy (dummy) — 주입 실행
@@ -223,6 +268,7 @@ jobs:
             | 이미지 태그 | `ti-server:${{ needs.release.outputs.image_tag }}` |
             | digest | `${{ steps.artifact.outputs.digest }}` |
             | 빌드 커밋 | `${{ needs.release.outputs.build_sha }}` |
+            | 빌드 JDK | `${{ steps.buildenv.outputs.jdk }}` |
             | UAT 대조 | `${{ steps.verify.outputs.matched_tag || 'MISS — UAT 기록 없음' }}` |
           draft: false
           prerelease: false
@@ -236,7 +282,11 @@ jobs:
           DIGEST: ${{ steps.artifact.outputs.digest }}
           MATCHED: ${{ steps.verify.outputs.matched_tag }}
           VMATCH: ${{ steps.verify.outputs.version_match }}
+          CAUSE: ${{ steps.verify.outputs.cause }}
+          CANDIDATE: ${{ steps.verify.outputs.candidate }}
           BUILD_SHA: ${{ needs.release.outputs.build_sha }}
+          JDK: ${{ steps.buildenv.outputs.jdk }}
+          GRADLE: ${{ steps.buildenv.outputs.gradle }}
         run: |
           if [ -n "$MATCHED" ]; then
             if [ "$VMATCH" = "true" ]; then
@@ -245,7 +295,7 @@ jobs:
               VERDICT="⚠️ \`${MATCHED}\` 와 digest는 같으나 **버전 예보가 빗나갔다** (재조립 정황)"
             fi
           else
-            VERDICT="❌ 같은 digest의 UAT 기록 없음 — UAT 미경유이거나 조립 후 소스가 바뀌었다"
+            VERDICT="❌ 같은 digest의 UAT 기록 없음${CANDIDATE:+ — 대조 대상 \`${CANDIDATE}\`}"
           fi
           {
             echo "## 🔴 PROD 배포 (dummy) — \`${IMAGE_TAG}\`"
@@ -258,9 +308,17 @@ jobs:
             echo "| 빌드 커밋 | [\`${BUILD_SHA:0:7}\`](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${BUILD_SHA}) |"
             echo "| PR | #${{ github.event.pull_request.number }} — ${{ github.event.pull_request.title }} |"
             echo "| 배포자 | @${GITHUB_ACTOR} |"
+            echo "| 빌드 JDK | \`${JDK}\` ← 고정하지 않고 기록만 한다 |"
+            echo "| Gradle | \`${GRADLE}\` |"
             echo ""
             echo "### UAT 대조"
             echo "${VERDICT}"
+            if [ -n "$CAUSE" ]; then
+              echo ""
+              echo "> **원인:** ${CAUSE}"
+              echo ">"
+              echo "> JDK를 고정하지 않고 **기록**하기 때문에, 불일치가 났을 때 어느 입력이 움직였는지 여기서 바로 지목된다."
+            fi
             echo ""
             echo "### 실행 중인 앱이 스스로 답하는 값"
             echo '```'
