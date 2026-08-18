@@ -23,6 +23,8 @@ public final class FeatureRegistry {
         List<String> features = new ArrayList<>();
         features.add("baseline");
         // ↓ feature 브랜치는 이 아래에 한 줄 추가한다 (여기가 충돌 지점)
+        features.add("audit-log");
+        features.add("export-csv");
         return features;
     }
 
