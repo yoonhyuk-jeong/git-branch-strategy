@@ -514,7 +514,8 @@
     <div class="shead"><span class="n">06</span><h2>Claude Code 커맨드 — 어떻게 쓰나</h2></div>
     <p class="sdesc">
       v4 본문의 <b>권장 도구</b>(부록 B). 규칙을 <code>.claude/</code>에 스킬 1개 + 커맨드 6개로 옮긴 것.<br>
-      ⚠️ <b>아직 레포에 체크인되지 않았다</b>(<code>.claude/</code> untracked) — 지금은 개인 로컬 전용이고 clone만으로는 쓸 수 없다. 07절 참조.<br>
+      팀 공용으로 쓰려면 <code>.claude/</code>의 스킬·커맨드를 레포에 <b>체크인</b>해야 clone만으로 동작한다
+      (<code>settings.local.json</code>과 <code>*.lock</code>은 로컬 전용이므로 제외). 07절 참조.<br>
       <code>imt-git-flow</code>는 <b>스킬</b>이라 아무것도 안 쳐도 브랜치·merge·배포 얘기가 나오면 배경에서 참고된다.
       <code>/</code>로 시작하는 6개는 <b>직접 입력해 실행하는 커맨드</b>다.<br>
       하루 흐름: <code class="mono">/imt-feature</code> → 커밋 →
@@ -550,7 +551,7 @@
       <div class="rule"><span class="i" style="color:var(--good)" aria-hidden="true">●</span><div>
         <b>부록 A — epic(버전 트랙) 미도입</b>
         <div class="sub">버전 트랙은 현행 방식 유지, 운영안은 참고로만 보존. 단
-          <code>release-</code> prefix 금지는 유지 → <code>release-2.13.0-0819</code>는 rename 또는 마감 후 삭제 대상.</div></div></div>
+          <code>release-</code> prefix 금지는 유지 → 버전+날짜 혼합 명명(<code>release-{버전}-{날짜}</code>)은 rename 또는 마감 후 삭제 대상.</div></div></div>
       <div class="rule"><span class="i" style="color:var(--good)" aria-hidden="true">●</span><div>
         <b>F1 — 조립 브랜치 유지</b>
         <div class="sub">prod 트리거가 <b>PR 1건 = 배포 1회</b>라서 묶음 배포에는 조립 브랜치가 필요하다.
@@ -571,37 +572,38 @@
     </div>
 
     <div class="panel" style="margin-top:18px">
-      <h3>남은 것은 적용이다 — 13절 재실측 (2026-08-14)</h3>
+      <h3>남은 것은 적용이다 — 13절 전환 체크리스트</h3>
       <p style="font-size:13px; color:var(--ink-2); margin-bottom:12px">
-        문서는 확정됐지만 <b>실제 레포에는 아직 적용 전</b>이다. 아래 1~3은 확정과 함께 켜야 하는 강제 장치다 —
-        이게 없으면 규칙이 강제되지 않는다.
+        문서가 확정돼도 규칙이 저절로 강제되지는 않는다. 아래 <b>①~③은 확정과 함께 켜야 하는 강제 장치</b>다 —
+        이게 없으면 v4는 권고에 그친다. 각 레포의 현재 적용 상태는 사내 문서(13절)에서 확인한다.
       </p>
       <table>
-        <thead><tr><th>항목</th><th>현재 상태</th><th>해야 할 것</th></tr></thead>
+        <thead><tr><th>항목</th><th>해야 할 것</th><th>안 하면</th></tr></thead>
         <tbody>
           <tr><td><b>GitHub merge 설정</b></td>
-              <td>Squash·Rebase merge <b>여전히 허용</b></td>
-              <td><b>①</b> 비활성 — same-SHA의 토대. <code>delete_branch_on_merge</code>는 false 유지</td></tr>
+              <td><b>①</b> Squash / Rebase merge 비활성. <code>delete_branch_on_merge</code>는 false 유지</td>
+              <td>same-SHA가 언제든 깨진다. 켜두면 test PR merge 때 feature가 삭제된다</td></tr>
           <tr><td><b>CI/CD</b></td>
-              <td>concurrency 없음 · 태그 <code>ti-server:master</code> 고정</td>
-              <td><b>②</b> prod concurrency + 버전/SHA 병행 태그 (감사 요건)</td></tr>
+              <td><b>②</b> prod concurrency group + 이미지 태그 버전/SHA 병행</td>
+              <td>Blue-Green 중첩. 환경명 고정 태그로는 "UAT에서 검증한 이미지 = prod 이미지" 증명 불가 (감사 요건)</td></tr>
           <tr><td><b>dev divergence</b></td>
-              <td>dev에만 576커밋 / master에만 13커밋</td>
-              <td><b>③</b> 1회 리셋 (orphan 검출 선행)</td></tr>
+              <td><b>③</b> dev 1회 리셋 (orphan 검출 선행)</td>
+              <td>divergence를 안고 시작하면 forward merge 규율이 성립하지 않는다</td></tr>
           <tr><td>열린 release</td>
-              <td><code>release-0814</code> 배포 완료 · <code>release-2.13.0-0819</code> 존속</td>
-              <td>0814 삭제 · 0819 rename 또는 마감 후 삭제</td></tr>
+              <td>배포 끝난 release 삭제. 혼합 명명(<code>release-{버전}-{날짜}</code>)은 rename</td>
+              <td><code>release-</code> prefix가 UAT 조립대 전용이라는 규칙이 흐려진다</td></tr>
           <tr><td><code>test</code> 브랜치</td>
-              <td>생성됨, master 대비 merge 0건 = <b>실사용 전</b></td>
-              <td>다음 기능부터 test PR을 본 리뷰 지점으로</td></tr>
+              <td>다음 기능부터 test PR을 본 리뷰 지점으로 사용 개시</td>
+              <td>브랜치만 있고 QA 게이트가 실제로 돌지 않는다</td></tr>
           <tr><td>feature 네이밍</td>
-              <td>date-first 채택 <b>0/17</b></td>
-              <td>기존 rename 강제 없이 <b>신규부터</b> 적용해 소진</td></tr>
+              <td>기존 브랜치 rename 강제 없이 <b>신규부터</b> 적용해 소진</td>
+              <td>일괄 rename은 진행 중인 PR을 깨뜨린다</td></tr>
           <tr><td>Claude Code 도구</td>
-              <td><code>.claude/</code> <b>untracked</b> — 개인 로컬 전용</td>
-              <td>팀 공용으로 쓸 거면 체크인 (스킬 1 + 커맨드 6만, <code>settings.local.json</code>·lock 제외)</td></tr>
+              <td>팀 공용으로 쓸 거면 체크인 (스킬 1 + 커맨드 6만, <code>settings.local.json</code>·lock 제외)</td>
+              <td>개인 로컬 전용이라 clone만으로는 쓸 수 없다</td></tr>
         </tbody>
       </table>
+    </div>
     </div>
   </section>
 
@@ -1000,7 +1002,7 @@ const CMDS = [
       '<b>uat dispatch 전 승인</b>',
     ],
     guards:[
-      '<code>release-2.13.0-0819</code> 같은 <b>버전+날짜 혼합 명명 거부</b> → <code>epic/</code> 안내',
+      '<code>release-{버전}-{날짜}</code> 같은 <b>버전+날짜 혼합 명명 거부</b> → <code>epic/</code> 안내',
       '<b>fold-in 금지</b> — 다른 release를 이번 release에 흡수하지 않는다. 미배포분은 원본 feature에서 다시 merge',
       'test/dev에서 release를 따지 않는다 — 대기 중인 기능이 딸려 들어간다',
     ],
