@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>0818 사이클 실행 기록 — IMT Git Branch v4 + 버전/digest 추적</title>
+<style>
+  :root{
+    color-scheme: light;
+    --page:#f9f9f7; --surface:#fcfcfb; --surface-2:#f2f1ec;
+    --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+    --grid:#e1e0d9; --line:#c3c2b7; --border:rgba(11,11,11,.10);
+    --featA:#2a78d6; --featB:#eb6834; --featC:#1baf7a;
+    --good:#0ca30c; --warn:#fab219; --crit:#d03b3b;
+    --code-bg:#f2f1ec;
+    --env1:#a3a19b; --env2:#7d7b76; --env3:#52514e; --env4:#0b0b0b;
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --page:#0d0d0d; --surface:#1a1a19; --surface-2:#242422;
+    --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --line:#383835; --border:rgba(255,255,255,.10);
+    --featA:#3987e5; --featB:#d95926; --featC:#199e70;
+    --good:#0ca30c; --warn:#fab219; --crit:#d03b3b;
+    --code-bg:#242422;
+    --env1:#575652; --env2:#898781; --env3:#b8b6ae; --env4:#ffffff;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --page:#0d0d0d; --surface:#1a1a19; --surface-2:#242422;
+      --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
+      --grid:#2c2c2a; --line:#383835; --border:rgba(255,255,255,.10);
+      --featA:#3987e5; --featB:#d95926; --featC:#199e70;
+      --code-bg:#242422;
+      --env1:#575652; --env2:#898781; --env3:#b8b6ae; --env4:#ffffff;
+    }
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--page); color:var(--ink);
+    font:15px/1.7 system-ui,-apple-system,"Segoe UI","Noto Sans KR",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px 96px}
+  code,pre,.mono{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace}
+  code{background:var(--code-bg);padding:.12em .4em;border-radius:4px;font-size:.88em}
+  pre{background:var(--code-bg);border:1px solid var(--border);border-radius:10px;
+      padding:16px 18px;overflow-x:auto;font-size:12.5px;line-height:1.55;margin:0}
+  a{color:var(--featA)}
+  h2{font-size:22px;margin:0 0 6px;letter-spacing:-.01em}
+  h3{font-size:16px;margin:28px 0 10px}
+  p{margin:0 0 12px;color:var(--ink-2)}
+  .lead{color:var(--ink-2)}
+
+  /* ── header ── */
+  header{border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:20}
+  .hbar{max-width:1080px;margin:0 auto;padding:12px 24px;display:flex;align-items:center;gap:14px}
+  .brand{font-weight:650;font-size:14px;letter-spacing:-.01em}
+  .brand span{color:var(--muted);font-weight:400}
+  .spacer{flex:1}
+  .btn{background:var(--surface-2);border:1px solid var(--border);color:var(--ink-2);
+       border-radius:999px;padding:5px 13px;font-size:12.5px;cursor:pointer;font-family:inherit}
+  .btn:hover{color:var(--ink)}
+
+  /* ── hero ── */
+  .hero{padding:56px 0 40px;border-bottom:1px solid var(--border)}
+  .kicker{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+  h1{font-size:38px;line-height:1.22;margin:0 0 14px;letter-spacing:-.022em;font-weight:680}
+  .hero p{font-size:16px;max-width:66ch}
+  .proof{margin-top:26px;background:var(--surface);border:1px solid var(--border);
+         border-left:3px solid var(--good);border-radius:12px;padding:18px 20px}
+  .proof-row{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;font-size:13px}
+  .proof-row + .proof-row{margin-top:6px}
+  .proof-label{width:130px;flex:none;color:var(--muted);font-size:12px}
+  .proof-val{font-family:ui-monospace,monospace;font-size:12px;word-break:break-all;flex:1;min-width:280px}
+  .verdict{margin-top:14px;padding-top:14px;border-top:1px solid var(--border);
+           font-size:14px;font-weight:600;color:var(--good);display:flex;gap:8px;align-items:center}
+
+  /* ── sections ── */
+  section{padding:44px 0;border-bottom:1px solid var(--border)}
+  .num{display:inline-block;font-size:11.5px;letter-spacing:.1em;color:var(--muted);
+       margin-bottom:8px;font-family:ui-monospace,monospace}
+
+  /* ── table ── */
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--grid);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12px;letter-spacing:.02em;
+     border-bottom:1px solid var(--line);white-space:nowrap}
+  tbody tr:last-child td{border-bottom:none}
+  td.mono,th.mono{font-family:ui-monospace,monospace;font-size:12px}
+
+  /* ── env strip ── */
+  .strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;margin:22px 0 10px}
+  .stop{position:relative;padding:0 10px}
+  .stop::before{content:"";position:absolute;top:13px;left:0;right:0;height:2px;background:var(--grid)}
+  .stop:first-child::before{left:50%}
+  .stop:last-child::before{right:50%}
+  .dot{position:relative;width:14px;height:14px;border-radius:50%;margin:7px auto 12px;
+       border:2px solid var(--surface);box-shadow:0 0 0 1px var(--border)}
+  .stop-name{text-align:center;font-weight:650;font-size:14px;margin-bottom:3px}
+  .stop-kind{text-align:center;font-size:11.5px;color:var(--muted);margin-bottom:9px}
+  .stop-val{text-align:center;font-family:ui-monospace,monospace;font-size:11.5px;
+            background:var(--surface);border:1px solid var(--border);border-radius:7px;
+            padding:7px 6px;word-break:break-all;line-height:1.45}
+  .stop-note{text-align:center;font-size:11.5px;color:var(--muted);margin-top:7px;line-height:1.5}
+
+  /* ── kanban matrix ── */
+  .kanban th:not(:first-child),.kanban td:not(:first-child){text-align:center;width:14%}
+  .mark{font-weight:700;font-size:15px}
+  .mark.no{color:var(--muted);font-weight:400}
+  .feat{display:inline-flex;align-items:center;gap:8px}
+  .swatch{width:10px;height:10px;border-radius:3px;flex:none}
+
+  /* ── cards ── */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(258px,1fr));gap:14px;margin-top:18px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
+  .card h4{margin:0 0 8px;font-size:14px;display:flex;gap:8px;align-items:center}
+  .card p{margin:0;font-size:13px;line-height:1.65}
+  .card pre{margin-top:10px;font-size:11.5px;padding:11px 12px}
+  .tick{color:var(--good);font-weight:700}
+  .card.finding{border-left:3px solid var(--warn)}
+  .card.finding h4{color:var(--ink)}
+
+  .note{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--line);
+        border-radius:10px;padding:14px 18px;margin:16px 0;font-size:13.5px;color:var(--ink-2)}
+  .note strong{color:var(--ink)}
+
+  .graph-legend{display:flex;gap:18px;flex-wrap:wrap;margin:10px 0 14px;font-size:12.5px;color:var(--ink-2)}
+  .graph-legend span{display:inline-flex;align-items:center;gap:7px}
+
+  footer{padding:34px 0;color:var(--muted);font-size:12.5px}
+  @media (max-width:720px){
+    h1{font-size:28px}
+    .strip{grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 0}
+    .stop::before{display:none}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hbar">
+    <div class="brand">0818 사이클 실행 기록 <span>· git-branch-strategy 샌드박스</span></div>
+    <div class="spacer"></div>
+    <button class="btn" id="theme">라이트 / 다크</button>
+  </div>
+</header>
+
+<div class="wrap">
+
+<div class="hero">
+  <div class="kicker">2026-08-18 · 실제 GitHub Actions 실행</div>
+  <h1>UAT에서 검증한 산출물이<br>그대로 prod에 나갔다는 것을 증명했다.</h1>
+  <p class="lead">
+    IMT Git Branch 전략 v4에 <strong>버전·digest 추적</strong>을 얹어, feature 생성부터 prod 배포까지
+    한 사이클을 샌드박스에서 끝까지 돌렸다. 4개 환경(dev/test/uat/prod) 배포가 모두 실제로 실행됐고,
+    아래 값들은 전부 그 실행에서 나온 것이다.
+  </p>
+
+  <div class="proof">
+    <div class="proof-row">
+      <div class="proof-label">UAT 산출물</div>
+      <div class="proof-val">sha256:1035d739a699004923153d2d04893d088857e25eb445e1a163754c56551364c9</div>
+    </div>
+    <div class="proof-row">
+      <div class="proof-label">PROD 산출물</div>
+      <div class="proof-val">sha256:1035d739a699004923153d2d04893d088857e25eb445e1a163754c56551364c9</div>
+    </div>
+    <div class="verdict"><span>✓</span> digest 동일 — prod 워크플로가 <code>uat-v*</code> 태그를 훑어 자동 판정했다. 사람이 비교하지 않는다.</div>
+  </div>
+</div>
+
+<section>
+  <div class="num">01</div>
+  <h2>버전은 어디서 생기고 어디에 붙는가</h2>
+  <p>기존 문제는 “버전이 git 파일과 GitHub Release에만 존재하고, 빌드·산출물·실행 중인 앱 어디에도 도달하지 않는다”였다.
+     이번 사이클은 그 경로를 뚫었다. 핵심 규칙은 <strong>버전이 존재하는 곳은 두 군데뿐</strong>이라는 것이다.</p>
+
+  <div class="strip">
+    <div class="stop">
+      <div class="dot" style="background:var(--env1)"></div>
+      <div class="stop-name">dev</div>
+      <div class="stop-kind">연동 놀이터 · push 자동</div>
+      <div class="stop-val">sha-9ed2e21</div>
+      <div class="stop-note">버전 없음.<br>“무슨 기능이 있나”로 읽는다</div>
+    </div>
+    <div class="stop">
+      <div class="dot" style="background:var(--env2)"></div>
+      <div class="stop-name">test</div>
+      <div class="stop-kind">QA 게이트 · dispatch</div>
+      <div class="stop-val">sha-b7efaeb</div>
+      <div class="stop-note">버전 없음.<br>QA 통과해도 배포일 미정이면 잔류</div>
+    </div>
+    <div class="stop">
+      <div class="dot" style="background:var(--env3)"></div>
+      <div class="stop-name">uat</div>
+      <div class="stop-kind">최종 게이트 · dispatch</div>
+      <div class="stop-val">uat-v1.1.0-rc.1</div>
+      <div class="stop-note"><strong>예보(forecast)</strong><br>“이대로 나가면 1.1.0이 된다”</div>
+    </div>
+    <div class="stop">
+      <div class="dot" style="background:var(--env4)"></div>
+      <div class="stop-name">prod</div>
+      <div class="stop-kind">PR merge 자동</div>
+      <div class="stop-val">v1.1.0</div>
+      <div class="stop-note"><strong>발급(issue)</strong><br>번호가 확정되는 유일한 지점</div>
+    </div>
+  </div>
+
+  <h3>왜 UAT에 태그를 달아도 안전한가</h3>
+  <p>버전 계산기(<code>git-semver-tags</code>)는 <strong>HEAD에서 도달 가능한 태그</strong>만 본다.
+     v4 금지규칙 3에 의해 <code>release-*</code>는 master에 merge되지 않으므로, 거기 붙인 rc 태그는
+     master에서 영원히 도달 불가다 — prod 버전 계산을 오염시킬 수 없다. 규칙이 보장하는 성질이지 우연이 아니다.
+     안전장치가 두 겹 더 있다: prefix가 <code>uat-v</code>라 <code>v</code>와 안 겹치고,
+     계산기가 <code>skipUnstable</code>로 <code>-rc.N</code> 같은 pre-release를 건너뛴다.</p>
+
+  <div class="note">
+    <strong>버전을 굽지 않고 주입한다.</strong> 버전 문자열을 빌드 시점에 산출물에 박으면 같은 코드라도
+    버전이 다르면 digest가 달라져, “UAT 검증분이 그대로 나갔다”를 증명할 수 없게 된다.
+    그래서 <code>APP_VERSION</code>을 실행 시 주입하고, 산출물은 버전과 무관하게 유지한다.
+    이번 사이클에서 UAT와 prod의 digest가 같아진 것이 이 설계 덕분이다.
+  </div>
+</section>
+
+<section>
+  <div class="num">02</div>
+  <h2>이번 사이클에 무엇이 어디까지 갔나</h2>
+  <p>v4의 “브랜치 = 칸반”. 기능 3개 중 2개만 이번에 배포했고, 1개는 QA를 통과했지만 배포일이 미정이라 test에 남겼다.</p>
+
+  <table class="kanban">
+    <thead>
+      <tr><th>기능</th><th>dev</th><th>test</th><th>release-0818</th><th>master (prod)</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="feat"><span class="swatch" style="background:var(--featA)"></span>
+            IMTDEV-4001 감사 로그 <code>feat</code></span></td>
+        <td class="mark">✓</td><td class="mark">✓</td><td class="mark">✓</td><td class="mark">✓</td>
+      </tr>
+      <tr>
+        <td><span class="feat"><span class="swatch" style="background:var(--featB)"></span>
+            IMTDEV-4002 CSV 내보내기 <code>feat</code></span></td>
+        <td class="mark no">—</td><td class="mark">✓</td><td class="mark">✓</td><td class="mark">✓</td>
+      </tr>
+      <tr>
+        <td><span class="feat"><span class="swatch" style="background:var(--featC)"></span>
+            IMTDEV-4003 null 방어 <code>fix</code></span></td>
+        <td class="mark">✓</td><td class="mark">✓</td><td class="mark no">—</td><td class="mark no">—</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>배포된 것은 <code>feat</code> 2건이므로 1.0.0 → <strong>1.1.0</strong> (minor). 4003은 <code>fix</code>지만
+     이번 범위 밖이라 버전에 반영되지 않았다 — 다음 사이클에서 계산된다.</p>
+
+  <h3>4개 환경 배포 실행 기록</h3>
+  <table>
+    <thead><tr><th>환경</th><th>트리거</th><th>소스</th><th class="mono">식별자</th><th>결과</th></tr></thead>
+    <tbody>
+      <tr><td>dev</td><td>push 자동</td><td class="mono">dev</td><td class="mono">sha-9ed2e21</td>
+          <td><a href="https://github.com/yoonhyuk-jeong/git-branch-strategy/actions/runs/32113202593">run ↗</a></td></tr>
+      <tr><td>test</td><td>dispatch</td><td class="mono">test</td><td class="mono">sha-b7efaeb</td>
+          <td><a href="https://github.com/yoonhyuk-jeong/git-branch-strategy/actions/runs/32113338190">run ↗</a></td></tr>
+      <tr><td>uat</td><td>dispatch</td><td class="mono">release-0818</td><td class="mono">uat-v1.1.0-rc.1</td>
+          <td><a href="https://github.com/yoonhyuk-jeong/git-branch-strategy/actions/runs/32113419222">run ↗</a></td></tr>
+      <tr><td>prod</td><td>PR #8 merged</td><td class="mono">assemble/0818</td><td class="mono">v1.1.0</td>
+          <td><a href="https://github.com/yoonhyuk-jeong/git-branch-strategy/actions/runs/32113535936">run ↗</a></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <div class="num">03</div>
+  <h2>실제 커밋 그래프</h2>
+  <p>아래는 <code>git log --graph</code> 원문이다. 가공하지 않았다.</p>
+  <div class="graph-legend">
+    <span><span class="swatch" style="background:var(--featA)"></span>4001 audit-log</span>
+    <span><span class="swatch" style="background:var(--featB)"></span>4002 export-csv</span>
+    <span><span class="swatch" style="background:var(--featC)"></span>4003 null-guard</span>
+  </div>
+<pre id="graph">*   298c853 (origin/dev, dev) Merge branch 'master' into dev
+|\
+* \   9ed2e21 Merge branch '0818/YH/IMTDEV-4003-visit-null-guard' into dev
+|\ \
+* \ \   9720cde Merge branch '0818/YH/IMTDEV-4001-audit-log' into dev
+|\ \ \
+| | | | *   94be8ff (origin/test, test) Merge branch 'master' into test
+| | | | |\
+| | | | |/
+| | | |/|
+| | | * | fb7f22a (origin/master, master) chore(release): v1.1.0 [skip ci]
+| | | * | 9db50e8 (tag: v1.1.0) Release 0818 (#8)
+| |_|/| |
+|/| | | |
+| | | * |   3353f32 Merge branch '0818/YH/IMTDEV-4002-export-csv' into assemble/0818
+| | | |\ \
+| | | * | | d610bf5 Merge branch '0818/YH/IMTDEV-4001-audit-log' into assemble/0818
+| |_|/| | |
+|/| |/ / /
+| |/| | |
+| | | | *   b7efaeb Merge pull request #7 from .../IMTDEV-4003-visit-null-guard
+| | | | |\
+| | | |_|/
+| | |/| |
+| | * | | 6afcd66 fix: IMTDEV-4003 Visit 목록 null 응답 방어
+| |/ / /
+|/| | |
+| | | *   462102e Merge pull request #6 from .../IMTDEV-4002-export-csv
+| | | |\
+| | | |/
+| | |/|
+| | * | 5da353d feat: IMTDEV-4002 결과 데이터 CSV 내보내기 추가
+| |/ /
+|/| |
+| | * 41dc2ad Merge pull request #5 from .../IMTDEV-4001-audit-log
+| |/|
+|/|/
+| * d68e5f8 feat: IMTDEV-4001 감사 로그 기록 추가
+|/
+* fdcac52 (tag: v1.0.0) build: version.yml 단일 소스 + 버전/digest 추적 파이프라인 도입</pre>
+
+  <div class="note">
+    <strong>master 끝부분의 두 줄이 핵심이다.</strong>
+    <code>9db50e8</code>에 태그 <code>v1.1.0</code>이 붙고 <strong>이 커밋이 빌드된다.</strong>
+    <code>fb7f22a</code>(version.yml·CHANGELOG 갱신)는 <strong>태그 뒤에</strong> 붙는 뒤처리라 산출물에 들어가지 않는다.
+    그래서 prod 산출물이 UAT 산출물과 바이트 단위로 같아질 수 있다.
+    실전 <code>image-trial-server</code>의 <code>6c518fec (tag: v1.219.0) Release 0814 (#3204)</code> + 뒤따르는
+    chore 커밋과 구조가 동일하다.
+  </div>
+</section>
+
+<section>
+  <div class="num">04</div>
+  <h2>배포 원장 — git 태그가 기록이다</h2>
+  <p>Actions 로그는 90일이면 만료된다. annotated 태그는 영구다. 그래서 “무엇이 어디에 나갔나”를 태그 메시지에 통째로 적는다.</p>
+<pre>$ git show uat-v1.1.0-rc.1
+
+tag uat-v1.1.0-rc.1
+Tagger: github-actions[bot]
+Date:   Tue Aug 18 07:51:26 2026 +0000
+
+UAT deploy — 1.1.0 (rc)
+
+env      : uat
+branch   : release-0818
+commit   : b5f30b61990e7980a0e06a1531590effc74324bd
+image    : ti-server:v1.1.0-rc.1
+digest   : sha256:1035d739a699004923153d2d04893d088857e25eb445e1a163754c56551364c9
+run      : .../actions/runs/32113419222
+by       : yoonhyuk-jeong
+
+주의: 이 버전은 예보(forecast)다. 재조립으로 범위가 바뀌면 실제 prod 버전이 달라질 수 있고,
+그 불일치는 prod 배포 요약에서 경고로 드러난다.</pre>
+
+  <h3>조회 방법</h3>
+  <table>
+    <thead><tr><th>알고 싶은 것</th><th class="mono">명령</th></tr></thead>
+    <tbody>
+      <tr><td>UAT 배포 이력 전부</td><td class="mono">git tag -l 'uat-v*'</td></tr>
+      <tr><td>그때 무엇이 나갔나</td><td class="mono">git show uat-v1.1.0-rc.1</td></tr>
+      <tr><td>이 커밋이 어디까지 갔나</td><td class="mono">git branch -r --contains &lt;sha&gt;</td></tr>
+      <tr><td>이번 rc 회차</td><td class="mono">git tag -l "uat-v1.1.0-rc.*" | wc -l</td></tr>
+      <tr><td>prod 릴리스 노트 + digest</td><td class="mono">gh release view v1.1.0</td></tr>
+      <tr><td>실행 중인 앱의 버전</td><td class="mono">/actuator/info <span style="color:var(--muted)">(실전) · 샌드박스는 stdout</span></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <div class="num">05</div>
+  <h2>부수적으로 검증된 것</h2>
+  <div class="cards">
+    <div class="card">
+      <h4><span class="tick">✓</span> rerere — 충돌 1회 해결로 3곳 반영</h4>
+      <p><code>FeatureRegistry</code>는 의도된 충돌 지점이다. test에서 한 번 풀었더니
+         <code>release-0818</code>과 <code>assemble/0818</code>에서 자동 재적용됐다.</p>
+      <pre>CONFLICT (content): Merge conflict in
+  .../com/ti/FeatureRegistry.java
+Resolved '.../FeatureRegistry.java'
+  using previous resolution.</pre>
+    </div>
+    <div class="card">
+      <h4><span class="tick">✓</span> 트리 정합성 — SHA로 증명</h4>
+      <p><code>release-0818</code>(UAT가 검증한 것)과 <code>assemble/0818</code>(master로 들어간 것)의
+         tree SHA가 완전히 같다. “조립을 다시 해도 같은 결과”가 추측이 아니라 해시로 확인된다.</p>
+      <pre>release-0818  e96b241c3a0e6a2c...
+assemble/0818 e96b241c3a0e6a2c...
+→ 동일</pre>
+    </div>
+    <div class="card">
+      <h4><span class="tick">✓</span> same-SHA 원칙</h4>
+      <p>같은 기능이 여러 목적지에 <strong>같은 커밋 SHA로</strong> 존재한다. 사본 브랜치가 없으니
+         “어디까지 갔나”를 SHA 하나로 물어볼 수 있다.</p>
+      <pre>d68e5f8 → dev, test, master
+5da353d → dev, test, master</pre>
+    </div>
+    <div class="card">
+      <h4><span class="tick">✓</span> merge commit 강제</h4>
+      <p>prod 워크플로가 master tip의 부모 수를 세어 Squash/Rebase merge를 잡아낸다.
+         레포 설정에서도 Squash/Rebase를 비활성화했다.</p>
+      <pre>OK  merge commit (부모 2개)
+    → same-SHA 유지</pre>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="num">06</div>
+  <h2>실전에 영향 있는 발견 2건</h2>
+  <div class="cards">
+    <div class="card finding">
+      <h4>① 브랜치 보호가 릴리스 봇의 커밋을 막는다</h4>
+      <p>첫 prod 실행이 실패했다. <strong>태그는 나갔고 커밋만 거부</strong>됐다.
+         실전 레포가 <code>actions/create-github-app-token</code>으로 org App 토큰을 쓰는 이유가 정확히 이것이다.</p>
+      <pre>remote: error: GH006: Protected branch update
+        failed for refs/heads/master.
+ * [new tag]  v1.1.0 -> v1.1.0        ← 성공
+ ! [rejected] master -> master        ← 거부</pre>
+      <p style="margin-top:10px">더 중요한 제약: <strong>개인 계정 레포에는 GitHub Actions를 bypass actor로 넣을 수 없다</strong>
+         (조직 전용). 즉 이 설계는 <em>org 레포 + App 토큰</em>이 전제다.</p>
+    </div>
+    <div class="card finding">
+      <h4>② version.yml 통째 덮어쓰기</h4>
+      <p>실전 워크플로는 <code>echo "version: X" &gt; version.yml</code>이라 파일의 주석이 매번 날아간다.
+         샌드박스는 <code>sed</code>로 version 줄만 치환하도록 바꿨고, 주석이 보존되는 것을 확인했다.
+         <strong>역포팅 대상.</strong></p>
+      <pre>sed -i -E "s|^version:[[:space:]]*.*|version: ${VERSION}|" \
+  version.yml</pre>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="num">07</div>
+  <h2>샌드박스와 실전의 차이</h2>
+  <p>여기서 검증한 것 중 무엇이 그대로 옮겨가고 무엇이 다른지 분명히 해 둔다.</p>
+  <table>
+    <thead><tr><th>항목</th><th>샌드박스</th><th>실전 image-trial-server</th></tr></thead>
+    <tbody>
+      <tr><td>digest 출처</td><td>jar의 <code>sha256sum</code><br><span style="color:var(--muted);font-size:12px">아카이브 타임스탬프 고정으로 재현성 확보</span></td>
+          <td>OCI digest<br><code>docker inspect --format='{{index .RepoDigests 0}}'</code></td></tr>
+      <tr><td>digest 일치 가능성</td><td>같은 트리면 <strong>항상 일치</strong></td>
+          <td><strong>보장되지 않음</strong> — base 이미지가 이동 태그(<code>ti-server-base:java17-gdcm</code>)라 그 사이 재푸시되면 달라진다</td></tr>
+      <tr><td>버전 주입</td><td>워크플로가 env로 직접</td><td>compose <code>environment:</code> → <code>/actuator/info</code></td></tr>
+      <tr><td>봇 push 권한</td><td>ruleset 완화</td><td>org GitHub App 토큰</td></tr>
+      <tr><td>배포</td><td>없음 (더미)</td><td>ghcr 푸시 + Blue-Green</td></tr>
+    </tbody>
+  </table>
+  <div class="note">
+    실전에서 digest가 갈릴 수 있다는 점은 <strong>결함이 아니라 측정값</strong>이다.
+    갈리면 “base 이미지가 바뀌었다”는 신호이고, 그 자체가 알아야 할 정보다.
+    prod 요약이 UAT 태그와 대조해 <code>MISS</code>를 띄우므로 조용히 넘어가지 않는다.
+  </div>
+</section>
+
+<footer>
+  실행: 2026-08-18 · 레포 <a href="https://github.com/yoonhyuk-jeong/git-branch-strategy">yoonhyuk-jeong/git-branch-strategy</a> ·
+  규칙 원본은 <a href="https://trialinformatics.atlassian.net/wiki/spaces/ImageTrial/pages/716800002">Confluence — IMT Git Branch 전략 v4</a> ·
+  <a href="./v4-flow.html">v4 전략 시각 설명 →</a>
+</footer>
+
+</div>
+
+<script>
+(function(){
+  var root = document.documentElement;
+  var saved = null;
+  try { saved = localStorage.getItem('theme'); } catch(e) {}
+  if (saved) root.setAttribute('data-theme', saved);
+  else root.removeAttribute('data-theme');   // OS 설정을 따른다
+
+  document.getElementById('theme').addEventListener('click', function(){
+    var isDark = getComputedStyle(root).getPropertyValue('color-scheme').trim() === 'dark';
+    var next = isDark ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+  });
+
+  // 커밋 그래프에 기능별 색을 입힌다 (색 단독이 아니라 텍스트와 함께 — 접근성)
+  var map = [
+    [/(IMTDEV-4001[^\s]*|audit-log)/g, 'featA'],
+    [/(IMTDEV-4002[^\s]*|export-csv)/g, 'featB'],
+    [/(IMTDEV-4003[^\s]*|null-guard|visit-null-guard)/g, 'featC']
+  ];
+  var pre = document.getElementById('graph');
+  var html = pre.textContent
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  map.forEach(function(m){
+    html = html.replace(m[0], '<span style="color:var(--'+m[1]+');font-weight:600">$1</span>');
+  });
+  html = html.replace(/(tag: v[0-9.]+)/g, '<span style="color:var(--good);font-weight:700">$1</span>');
+  pre.innerHTML = html;
+})();
+</script>
+</body>
+</html>
