@@ -549,24 +549,32 @@
   <div class="num">04</div>
   <h2>배포 원장 — git 태그가 기록이다</h2>
   <p>Actions 로그는 90일이면 만료된다. annotated 태그는 영구다. 그래서 “무엇이 어디에 나갔나”를 태그 메시지에 통째로 적는다.</p>
-<pre>$ git show uat-v1.1.0-rc.1
+<pre>$ git show uat-v1.1.1-rc.1
 
-tag uat-v1.1.0-rc.1
+tag uat-v1.1.1-rc.1
 Tagger: github-actions[bot]
-Date:   Tue Aug 18 07:51:26 2026 +0000
+Date:   Tue Aug 18 08:49:53 2026 +0000
 
-UAT deploy — 1.1.0 (rc)
+UAT deploy — 1.1.1 (rc)
 
 env      : uat
-branch   : release-0818
-commit   : b5f30b61990e7980a0e06a1531590effc74324bd
-image    : ti-server:v1.1.0-rc.1
-digest   : sha256:1035d739a699004923153d2d04893d088857e25eb445e1a163754c56551364c9
-run      : .../actions/runs/32113419222
+branch   : release-0819
+commit   : 9b8d2f087977aaf277f73dafaf7e6cffbecf5b60
+image    : ti-server:v1.1.1-rc.1
+digest   : sha256:8e85fcec47f58575dd9d2c09a1e5a450bdb062ed39b22dd865c2195fa686c9c6
+jdk      : Amazon.com Inc. 17.0.20+8-LTS
+gradle   : 8.13
+run      : .../actions/runs/32118346190
 by       : yoonhyuk-jeong
 
 주의: 이 버전은 예보(forecast)다. 재조립으로 범위가 바뀌면 실제 prod 버전이 달라질 수 있고,
 그 불일치는 prod 배포 요약에서 경고로 드러난다.</pre>
+
+  <div class="note">
+    <strong>jdk / gradle 줄은 나중에 추가됐다.</strong> 위는 0818 다음 사이클(<code>1.1.1</code>)의 태그다 —
+    0818 사이클의 <code>uat-v1.1.0-rc.1</code> 에는 이 두 줄이 없다.
+    무엇을 왜 기록하는지는 <a href="#drift">07절</a> 참고.
+  </div>
 
   <h3>조회 방법</h3>
   <table>
@@ -647,7 +655,7 @@ assemble/0818 e96b241c3a0e6a2c...
 </section>
 
 <section>
-  <div class="num">07</div>
+  <div class="num" id="drift">07</div>
   <h2>샌드박스와 실전의 차이</h2>
   <p>여기서 검증한 것 중 무엇이 그대로 옮겨가고 무엇이 다른지 분명히 해 둔다.</p>
   <table>
@@ -656,16 +664,45 @@ assemble/0818 e96b241c3a0e6a2c...
       <tr><td>digest 출처</td><td>jar의 <code>sha256sum</code><br><span style="color:var(--muted);font-size:12px">아카이브 타임스탬프 고정으로 재현성 확보</span></td>
           <td>OCI digest<br><code>docker inspect --format='{{index .RepoDigests 0}}'</code></td></tr>
       <tr><td>digest 일치 가능성</td><td>같은 트리면 <strong>항상 일치</strong></td>
-          <td><strong>보장되지 않음</strong> — base 이미지가 이동 태그(<code>ti-server-base:java17-gdcm</code>)라 그 사이 재푸시되면 달라진다</td></tr>
+          <td><strong>보장되지 않음</strong> — prod는 master 머지 커밋에서 <strong>다시 빌드</strong>한다.
+              재현성은 빌드 입력이 전부 고정일 때만 성립한다 (아래 참고)</td></tr>
       <tr><td>버전 주입</td><td>워크플로가 env로 직접</td><td>compose <code>environment:</code> → <code>/actuator/info</code></td></tr>
       <tr><td>봇 push 권한</td><td>ruleset 완화</td><td>org GitHub App 토큰</td></tr>
       <tr><td>배포</td><td>없음 (더미)</td><td>ghcr 푸시 + Blue-Green</td></tr>
     </tbody>
   </table>
+  <h3>빌드 입력 중 무엇이 움직일 수 있나</h3>
+  <p>실전 <code>image-trial-server</code>를 실제로 확인한 결과다.</p>
+  <table>
+    <thead><tr><th>입력</th><th>고정돼 있나</th></tr></thead>
+    <tbody>
+      <tr><td>Gradle 의존성</td><td><span style="color:var(--fg-ok);font-weight:700">고정</span> — 동적 버전(<code>+</code>, <code>latest</code>, 범위) 없음</td></tr>
+      <tr><td>base 이미지</td><td><strong>실질 고정</strong> — <code>ti-server-base:java17-gdcm</code>은 어느 워크플로도 재빌드하지 않는다.
+          digest가 아니라 <strong>태그</strong>로 참조하므로 레지스트리가 불변을 보장하진 않는다 — 관행이지 규칙이 아니다</td></tr>
+      <tr><td><strong>빌드 JDK</strong></td><td><span style="color:var(--fg-warn);font-weight:700">고정 아님</span> —
+          <code>java-version: '17'</code>은 <strong>최신 패치로 해석된다</strong>
+          (실행 로그: <code>Resolved latest version as 17.0.20+8.1</code>).
+          <code>corretto</code> 배포판은 setup-java에서 <strong>major 버전만</strong> 지정할 수 있어 패치 고정이 아예 불가능하다</td></tr>
+    </tbody>
+  </table>
+
+  <h3>그래서 고정하지 않고 기록한다</h3>
+  <p>JDK를 고정하면 CVE 패치를 자동으로 못 받는다. 그래서 <strong>고정(prevention) 대신 감지(detection)</strong>를 택했다 —
+     빌드 JDK와 Gradle 버전을 배포 원장에 남기고, digest가 어긋나면 <strong>무엇이 움직였는지 지목한다.</strong></p>
+  <div class="cards">
+    <div class="card"><h4>소스 트리가 다르다</h4>
+      <p>UAT 태그가 가리키는 트리 SHA ≠ prod 빌드 커밋의 트리 SHA.
+         조립 이후 코드가 바뀐 것 — <strong>가장 심각한 경우</strong>다.</p></div>
+    <div class="card"><h4>빌드 JDK가 움직였다</h4>
+      <p>트리는 같은데 기록된 JDK가 다르다. 소스는 그대로이고 컴파일러만 바뀐 것.</p></div>
+    <div class="card"><h4>기록 안 된 변수가 움직였다</h4>
+      <p>트리도 JDK도 같은데 digest가 다르다. base 이미지 등 아직 기록하지 않는 입력을 의심한다.</p></div>
+    <div class="card"><h4>UAT 미경유</h4>
+      <p>이 버전으로 UAT에 올린 기록 자체가 없다. v4 금지규칙 7 위반.</p></div>
+  </div>
   <div class="note">
-    실전에서 digest가 갈릴 수 있다는 점은 <strong>결함이 아니라 측정값</strong>이다.
-    갈리면 “base 이미지가 바뀌었다”는 신호이고, 그 자체가 알아야 할 정보다.
-    prod 요약이 UAT 태그와 대조해 <code>MISS</code>를 띄우므로 조용히 넘어가지 않는다.
+    이 4가지 분기를 실제 태그를 대상으로 전부 돌려 확인했다.
+    digest가 갈리는 것은 <strong>결함이 아니라 측정값</strong>이다 — 갈렸다는 사실과 그 원인이 곧 알아야 할 정보다.
   </div>
 </section>
 
