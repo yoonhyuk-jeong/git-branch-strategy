@@ -24,6 +24,11 @@
   a.card p{margin:0;font-size:13.5px;color:var(--ink-2);line-height:1.6}
   .tag{display:inline-block;margin-top:8px;font-size:11.5px;color:var(--muted);
        border:1px solid var(--border);border-radius:999px;padding:2px 9px}
+  a.card .num{display:block;font-size:11px;letter-spacing:.1em;color:var(--muted);
+              margin-bottom:6px;font-family:ui-monospace,Menlo,Consolas,monospace}
+  .appendix{margin:22px 0 0;font-size:13px;color:var(--muted);line-height:1.65;
+            padding-top:18px;border-top:1px solid var(--border)}
+  .appendix a{color:var(--ink-2)}
   footer{margin-top:34px;font-size:12.5px;color:var(--muted)}
   footer a{color:var(--accent)}
 </style>
@@ -31,32 +36,35 @@
 <body>
 <div class="wrap">
   <h1>IMT Git Branch 전략 v4</h1>
-  <p class="sub">브랜치·merge·배포 플로우와 버전/digest 추적에 대한 시각 자료.<br>
-     실행 기록은 <b>어느 레포에서 돌린 것인지</b>에 따라 두 장으로 나뉜다.</p>
+  <p class="sub">규칙과, 그 규칙대로 실제로 돌려 본 기록. 두 장이다.</p>
 
   <a class="card" href="./v4-flow.html">
+    <span class="num">01 — 규칙</span>
     <h2>전략 시각 설명 →</h2>
     <p>v4가 무엇이고 v3와 뭐가 다른지. 4개 독립 목적지, 조립 PR, 금지 규칙 10개,
-       <code>/imt-*</code> 커맨드 사용법. 시나리오를 단계별로 재생할 수 있다.</p>
+       <code>/imt-*</code> 커맨드 사용법. 시나리오를 단계별로 재생할 수 있다.<br>
+       <span class="tag">Confluence v4 확정본의 시각화</span></p>
   </a>
 
-  <a class="card" href="./cycle-0818.html">
-    <h2>0818 사이클 실행 기록 →</h2>
-    <p>feature 생성부터 prod 배포까지 <b>한 사이클을 통째로</b> 돌린 결과.
-       기능 3개로 칸반(대기·추월) · 조립 PR 1건 · rerere 자동 재적용 · 커밋 그래프를 확인했다.
-       <span class="tag">개인 레포 실행분</span></p>
+  <a class="card" href="./cycle-0819.html">
+    <span class="num">02 — 실행 기록</span>
+    <h2>0819 사이클 실행 기록 →</h2>
+    <p>기능 3개를 만들어 <b>2개만 배포</b>하고 1개는 test에 남긴 한 사이클.
+       dev·test·uat·prod 4개 환경이 모두 실제로 배포됐고,
+       <b>UAT에서 검증한 컨테이너 이미지가 그대로 prod에 나갔다</b>는 것을 OCI digest로 증명했다.
+       조립 PR 1건이 배포를 정확히 1회만 돌린 것, 충돌을 한 번 풀어 3곳에 자동 재적용된 것도 실측했다.<br>
+       <span class="tag">조직 샌드박스 · v1.3.0</span></p>
   </a>
 
-  <a class="card" href="./verify-digest.html">
-    <h2>digest 동일성 검증 →</h2>
-    <p>UAT에서 검증한 <b>그 컨테이너 이미지가 그대로 prod에 나갔다</b>는 것을 실제 OCI digest로 증명.
-       레포 설정 3개를 바꿔야 v4가 켜진다는 것도 여기서 나왔다.
-       <span class="tag">조직 샌드박스 실행분</span></p>
-  </a>
+  <p class="appendix">부록 —
+    <a href="./cycle-0818.html">0818 사이클 (개인 레포 런)</a> ·
+    조직 이관 전에 같은 플로우를 돌린 기록. 산출물 동일성 근거가 jar <code>sha256sum</code>이라
+    02가 이를 대체한다.
+  </p>
 
   <footer>
     규칙 원본(단일 진실):
-    <a href="https://trialinformatics.atlassian.net/wiki/spaces/ImageTrial/pages/716800002">Confluence — IMT Git Branch 전략 v4</a>
+    <a href="https://trialinformatics.atlassian.net/wiki/spaces/ImageTrial/pages/716800002/IMT+Git+Branch+v4">Confluence — IMT Git Branch 전략 v4</a>
   </footer>
 </div>
 </body>

@@ -9,13 +9,13 @@
 | 페이지 | 내용 |
 | --- | --- |
 | [`index.html`](docs/index.html) | 허브 |
-| [`v4-flow.html`](docs/v4-flow.html) | 전략 시각 설명 — 4개 독립 목적지, 조립 PR, 금지 규칙 10개, `/imt-*` 커맨드 |
-| [`cycle-0818.html`](docs/cycle-0818.html) | v4 플로우 한 사이클 실행 기록 — **이 레포에서 실행** |
-| [`verify-digest.html`](docs/verify-digest.html) | UAT→PROD 이미지 digest 동일성 검증 — 조직 샌드박스에서 실행 |
+| [`v4-flow.html`](docs/v4-flow.html) | **① 규칙** — 전략 시각 설명. 4개 독립 목적지, 조립 PR, 금지 규칙 10개, `/imt-*` 커맨드 |
+| [`cycle-0819.html`](docs/cycle-0819.html) | **② 실행 기록** — 0819 사이클. 조직 샌드박스에서 실행 (v1.3.0) |
+| [`cycle-0818.html`](docs/cycle-0818.html) | 부록 — 0818 사이클. **이 레포에서 실행** (조직 이관 전) |
 
 ## 히스토리를 남겨 둔 이유
 
-`cycle-0818.html`이 기록한 사이클은 **이 레포에서 실제로 돌린 것**이다.
+부록인 `cycle-0818.html`이 기록한 사이클은 **이 레포에서 실제로 돌린 것**이다.
 그 증거는 문서가 아니라 레포에 있다:
 
 - 브랜치 `dev` / `test` — "브랜치 = 칸반"의 실물

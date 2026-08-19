@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>digest 동일성 검증 (조직 샌드박스) — IMT Git Branch v4</title>
+<title>0819 사이클 실행 기록 — IMT Git Branch v4 + 버전/digest 추적</title>
 <style>
   :root{
     color-scheme: light;
@@ -173,7 +173,7 @@
 
 <header>
   <div class="hbar">
-    <div class="brand">digest 동일성 검증 <span>· 조직 샌드박스 실행분</span></div>
+    <div class="brand">0819 사이클 실행 기록 <span>· 조직 샌드박스</span></div>
     <div class="spacer"></div>
     <button class="btn" id="theme">라이트 / 다크</button>
   </div>
@@ -182,88 +182,161 @@
 <div class="wrap">
 
 <div class="hero">
-  <div class="kicker">2026-08-18 · trial-informatics 조직 레포 · 실제 GitHub Actions 실행</div>
-  <h1>UAT에서 검증한 그 이미지가<br>그대로 prod에 나갔다.</h1>
+  <div class="kicker">2026-08-19 · trial-informatics 조직 레포 · 실제 GitHub Actions 실행</div>
+  <h1>기능 3개 중 2개만 배포했고,<br>UAT에서 검증한 그 이미지가 그대로 나갔다.</h1>
   <p class="lead">
-    샌드박스를 조직 레포로 옮기고 <strong>jib → ghcr</strong>를 붙여 실전과 같은 조건으로 맞춘 뒤,
-    <strong>실제 컨테이너 이미지를 레지스트리에 올려</strong> 아래 값을 뽑았다 —
-    실전과 같은 <code>docker inspect --format='{{index .RepoDigests 0}}'</code> 명령이다.
+    IMT Git Branch 전략 v4에 <strong>버전·digest 추적</strong>을 얹어 한 사이클을 끝까지 돌렸다.
+    4개 환경(dev/test/uat/prod) 배포가 <strong>모두 실제로 실행</strong>됐고, 실제 컨테이너 이미지를
+    레지스트리에 올려 아래 값을 뽑았다 — 실전과 같은
+    <code>docker inspect --format='{{index .RepoDigests 0}}'</code> 명령이다.
   </p>
 
   <div class="proof">
     <div class="proof-row">
-      <div class="proof-label">UAT 이미지<br><span style="font-weight:400">uat-v1.2.0-rc.1</span></div>
-      <div class="proof-val">sha256:cd9c4b1c91c9e4206723a80477c5fd11bbf6386d040cab83ee670387155ad59e</div>
+      <div class="proof-label">UAT 이미지<br><span style="font-weight:400">uat-v1.3.0-rc.1</span></div>
+      <div class="proof-val">sha256:dd51881f7da46d859df511e796c39a29d3b0b48741daf68ad9b0f0be184e487f</div>
     </div>
     <div class="proof-row">
-      <div class="proof-label">PROD 이미지<br><span style="font-weight:400">v1.2.0</span></div>
-      <div class="proof-val">sha256:cd9c4b1c91c9e4206723a80477c5fd11bbf6386d040cab83ee670387155ad59e</div>
+      <div class="proof-label">PROD 이미지<br><span style="font-weight:400">v1.3.0</span></div>
+      <div class="proof-val">sha256:dd51881f7da46d859df511e796c39a29d3b0b48741daf68ad9b0f0be184e487f</div>
     </div>
     <div class="verdict"><span>✓</span> digest 동일 — prod 워크플로가 <code>uat-v*</code> 태그를 훑어 자동 판정했다. 사람이 비교하지 않는다.</div>
   </div>
 
   <div class="note" style="margin-top:18px">
-    <strong>이게 왜 강한 증거인가.</strong> UAT는 <code>release-0818</code>의 커밋(<code>06681e6</code>)에서, prod는
-    <strong>master 머지 커밋(<code>001563e</code>)에서 각각 따로 빌드했다.</strong>
+    <strong>이게 왜 강한 증거인가.</strong> UAT는 <code>release-0819</code>의 커밋(<code>4448e5a</code>)에서, prod는
+    <strong>master 머지 커밋(<code>8999681</code>)에서 각각 따로 빌드했다.</strong>
     서로 다른 커밋에서 독립적으로 빌드한 두 이미지가 바이트 단위로 같다는 뜻이다.
-    이미지 안에 버전을 넣지 않았기 때문에 가능하다 — 버전은 컨테이너를 띄울 때 밖에서 알려준다.
+    이미지 안에 버전을 넣지 않았기 때문에 가능하다 — 버전은 컨테이너를 띄울 때 밖에서 알려준다(<a href="#inject">03절</a>).
   </div>
 </div>
 
 <section>
   <div class="num">01</div>
-  <h2>이번 런에서 실제로 돌아간 것</h2>
-  <p>조직 레포 <code>trial-informatics/git-branch-strategy-sandbox</code>에서 2026-08-18 18:08~18:26 (KST)
-     사이에 워크플로가 <strong>5회</strong> 실행됐다. 아래가 전부다.</p>
-  <table>
-    <thead><tr><th>환경</th><th>트리거</th><th>소스</th><th>이미지 태그</th><th>digest</th></tr></thead>
+  <h2>이번 사이클에 무엇이 어디까지 갔나</h2>
+  <p>v4의 “브랜치 = 칸반”. 기능 3개를 만들어 <strong>2개만 배포</strong>했고, 1개는 QA를 통과했지만
+     배포일이 미정이라 <code>test</code>에 남겼다. 셋 다 <code>FeatureRegistry.register()</code>
+     같은 자리를 건드려 <strong>충돌을 강제</strong>했다.</p>
+  <table class="kanban">
+    <thead><tr><th>기능</th><th>dev</th><th>test</th><th>release-0819</th><th>master (prod)</th></tr></thead>
     <tbody>
-      <tr><td>dev</td><td>push 자동</td><td class="mono">dev / 6356316</td><td class="mono">sha-6356316</td><td class="mono">—</td></tr>
-      <tr><td>dev</td><td>push 자동</td><td class="mono">dev / ecb699e</td><td class="mono">sha-ecb699e</td><td class="mono">—</td></tr>
-      <tr style="background:var(--surface)"><td><strong>uat</strong></td><td>dispatch</td><td class="mono">release-0818 / 06681e6</td>
-          <td class="mono">v1.2.0-rc.1</td><td class="mono">sha256:cd9c4b1c…</td></tr>
-      <tr style="background:var(--surface)"><td><strong>prod</strong></td><td>PR #2 merged</td><td class="mono">master / 001563e</td>
-          <td class="mono">v1.2.0</td><td class="mono">sha256:cd9c4b1c…</td></tr>
-      <tr><td>dev</td><td>push 자동</td><td class="mono">dev / f3c56fc</td><td class="mono">sha-f3c56fc</td><td class="mono">sha256:2f52460f…</td></tr>
+      <tr><td><span class="feat"><span class="swatch" style="background:var(--featA)"></span>IMTDEV-4005 재시도 정책 <span style="color:var(--muted)">feat</span></span></td>
+          <td class="mark">✓</td><td class="mark">✓</td><td class="mark">✓</td><td class="mark">✓</td></tr>
+      <tr><td><span class="feat"><span class="swatch" style="background:var(--featB)"></span>IMTDEV-4006 XML 내보내기 <span style="color:var(--muted)">feat</span></span></td>
+          <td class="mark">✓</td><td class="mark">✓</td><td class="mark">✓</td><td class="mark">✓</td></tr>
+      <tr><td><span class="feat"><span class="swatch" style="background:var(--featC)"></span>IMTDEV-4007 타임아웃 방어 <span style="color:var(--muted)">fix</span></span></td>
+          <td class="mark">✓</td><td class="mark">✓</td><td class="mark no">—</td><td class="mark no">—</td></tr>
     </tbody>
   </table>
+  <p>배포된 것이 feat 2건이므로 <code>1.2.0</code> → <code>1.3.0</code> (minor).
+     4007은 fix지만 이번 범위 밖이라 버전에 반영되지 않았다 — 다음 사이클에서 계산된다.</p>
 
+  <div class="note">
+    <strong>제외가 말이 아니라 산출물로 확인된다.</strong> prod 컨테이너가 실제로 뜨면서 등록된 기능을 출력한다.
+    거기에 <code>timeout-guard</code>가 <strong>없다.</strong> 같은 시점 <code>test</code> tip을 빌드해 실행하면 <strong>있다.</strong>
+  </div>
   <div class="cards">
     <div class="card">
-      <h4><span class="tick">✓</span> merge commit 가드가 돌았다</h4>
-      <p>prod 워크플로가 master tip의 부모 수를 세어 Squash/Rebase merge를 잡아낸다.</p>
-      <pre>✅ merge commit (부모 2개) — same-SHA 유지</pre>
-    </div>
-    <div class="card">
-      <h4><span class="tick">✓</span> UAT 대조가 자동으로 판정했다</h4>
-      <p><code>uat-v*</code> 태그를 훑어 digest를 비교한다. 사람이 눈으로 맞추지 않는다.</p>
-      <pre>✅ digest 일치 — UAT(uat-v1.2.0-rc.1)에서
-   검증한 이미지가 그대로 나간다</pre>
-    </div>
-    <div class="card">
-      <h4><span class="tick">✓</span> 트리 SHA도 같다</h4>
-      <p>digest뿐 아니라 두 커밋의 트리 자체가 같다. 조립 이후 코드가 바뀌지 않았다는 뜻이다.</p>
-      <pre>06681e6 (release-0818) → 8f556711…
-001563e (master merge) → 8f556711…</pre>
-    </div>
-    <div class="card">
-      <h4><span class="tick">✓</span> 컨테이너가 실제로 떴다</h4>
-      <p>배포 스텝이 이미지를 <code>docker run</code>으로 띄우고 그 출력을 배포 요약에 남긴다.</p>
-      <pre>env     : prod
-version : v1.2.0
-registered features:
+      <h4>prod (v1.3.0)</h4>
+      <pre>registered features:
   - baseline
+  - retry-policy
+  - xml-export
+  - audit-log
+  - export-csv
+  - json-export</pre>
+    </div>
+    <div class="card">
+      <h4>test tip (버전 없음)</h4>
+      <pre>registered features:
+  - baseline
+  - retry-policy
+  - xml-export
+  <b>- timeout-guard</b>   ← 대기 중
   - audit-log
   - export-csv
   - json-export</pre>
     </div>
   </div>
+
+  <h3>4개 환경 배포 실행 기록</h3>
+  <table>
+    <thead><tr><th>환경</th><th>트리거</th><th>소스</th><th>식별자</th><th>digest</th><th>결과</th></tr></thead>
+    <tbody>
+      <tr><td>dev</td><td>push 자동</td><td class="mono">dev / a059f9f</td><td class="mono">sha-a059f9f</td>
+          <td class="mono">d7ca6a2f…</td><td><a href="https://github.com/trial-informatics/git-branch-strategy-sandbox/actions/runs/32218652960">run ↗</a></td></tr>
+      <tr><td>test</td><td>dispatch</td><td class="mono">test / 0c8e84f</td><td class="mono">sha-0c8e84f</td>
+          <td class="mono">d7ca6a2f…</td><td><a href="https://github.com/trial-informatics/git-branch-strategy-sandbox/actions/runs/32218858852">run ↗</a></td></tr>
+      <tr><td>uat</td><td>dispatch</td><td class="mono">release-0819 / 4448e5a</td><td class="mono">uat-v1.3.0-rc.1</td>
+          <td class="mono">dd51881f…</td><td><a href="https://github.com/trial-informatics/git-branch-strategy-sandbox/actions/runs/32219194429">run ↗</a></td></tr>
+      <tr><td>prod</td><td>PR #6 merged</td><td class="mono">assemble/0819 / 8999681</td><td class="mono">v1.3.0</td>
+          <td class="mono">dd51881f…</td><td><a href="https://github.com/trial-informatics/git-branch-strategy-sandbox/actions/runs/32219397363">run ↗</a></td></tr>
+    </tbody>
+  </table>
+  <div class="note">
+    <strong>dev와 test의 digest가 같다.</strong> 서로 다른 커밋인데(<code>a059f9f</code> / <code>0c8e84f</code>)
+    담고 있는 트리가 같아서 이미지가 같아졌다. 커밋이 아니라 <strong>내용</strong>이 산출물을 결정한다는 뜻이다.
+  </div>
 </section>
 
 <section>
   <div class="num">02</div>
+  <h2>실제 커밋 그래프</h2>
+  <p>위에서 아래로 시간이 흐른다. <code>dev</code>는 파이프라인 밖이라 생략했다.
+     <strong>같은 feature 커밋이 여러 목적지에 각각 merge</strong>되는 모양을 보라 —
+     사본 브랜치가 하나도 없다.</p>
+  <div class="graph-legend">
+    <span><span class="swatch" style="background:var(--featA)"></span>IMTDEV-4005 retry-policy</span>
+    <span><span class="swatch" style="background:var(--featB)"></span>IMTDEV-4006 xml-export</span>
+    <span><span class="swatch" style="background:var(--featC)"></span>IMTDEV-4007 timeout-guard</span>
+  </div>
+  <div class="gwrap"><pre id="rawgraph">* 04ae117 (master) docs: 0819 사이클 실측 기록 + F5(orphan 검출 명령 오류) 발견
+| *   3ab0a15 (test) Merge branch &#x27;master&#x27; into test
+| |\  
+| |/  
+|/|   
+* | 421f99c chore(release): v1.3.0 [skip ci]
+* | 9a28c83 (tag: v1.3.0) Merge pull request #6 from assemble/0819
+* |   8999681 Merge branch &#x27;0819/YH/IMTDEV-4006-xml-export&#x27; into assemble/0819
+|\ \  
+* | | d794156 Merge branch &#x27;0819/YH/IMTDEV-4005-retry-policy&#x27; into assemble/0819
+| | *   0c8e84f Merge pull request #5 from 0819/YH/IMTDEV-4007-timeout-guard
+| | |\  
+| | | * 0ee8f36 (0819/YH/IMTDEV-4007-timeout-guard) fix: IMTDEV-4007 대용량 응답 타임아웃 방어
+| | *   42b41bc Merge pull request #4 from 0819/YH/IMTDEV-4006-xml-export
+| | |\  
+| | |/  
+| |/|   
+| | * d136a70 Merge pull request #3 from 0819/YH/IMTDEV-4005-retry-policy
+| |/  
+|/|   
+| | *   4448e5a (tag: uat-v1.3.0-rc.1) Merge branch &#x27;0819/YH/IMTDEV-4006-xml-export&#x27; into release-0819
+| | |\  
+| | |/  
+| |/|   
+| * | 692eaf6 (0819/YH/IMTDEV-4006-xml-export) feat: IMTDEV-4006 결과 데이터 XML 내보내기 추가
+|  /  
+| * f8a77d6 Merge branch &#x27;0819/YH/IMTDEV-4005-retry-policy&#x27; into release-0819
+|/  
+* cb83251 (0819/YH/IMTDEV-4005-retry-policy) feat: IMTDEV-4005 PACS 전송 실패 시 재시도 정책 추가</pre></div>
+  <div class="note">
+    <strong>master 끝부분의 두 줄이 핵심이다.</strong> <code>9a28c83</code>에 태그 <code>v1.3.0</code>이 붙고
+    <strong>이 커밋이 빌드된다.</strong> <code>421f99c</code>(version.yml·CHANGELOG 갱신)는
+    <strong>태그 뒤에</strong> 붙는 뒤처리라 산출물에 들어가지 않는다. 그래서 prod 산출물이 UAT 산출물과
+    바이트 단위로 같아질 수 있다.
+  </div>
+  <div class="note">
+    <strong>같은 SHA가 네 곳에 있다.</strong> 사본 브랜치를 만들지 않았으므로
+    “이 기능이 어디까지 갔나”를 SHA 하나로 물어볼 수 있다.
+<pre>$ git branch -r --contains cb83251
+  origin/dev  origin/master  origin/release-0819  origin/test</pre>
+  </div>
+</section>
+
+<section>
+  <div class="num" id="inject">03</div>
   <h2>왜 같은 digest가 나올 수 있나</h2>
-  <p>UAT와 prod는 <strong>버전이 다르다</strong> — <code>1.2.0-rc.1</code>과 <code>1.2.0</code>.
+  <p>UAT와 prod는 <strong>버전이 다르다</strong> — <code>1.3.0-rc.1</code>과 <code>1.3.0</code>.
      그런데도 이미지가 같다. 설계를 그렇게 잡았기 때문이다.</p>
 
   <div class="note">
@@ -271,7 +344,7 @@ registered features:
     버전이 다르면 이미지가 달라진다. 그러면 “UAT에서 검증한 그 이미지가 그대로 나갔다”를
     digest로 증명할 방법이 없어진다. 그래서 이미지는 자기 버전을 모르는 채로 만들고,
     컨테이너를 띄울 때 <code>APP_VERSION</code>으로 알려준다. 같은 이미지가 UAT에서는
-    <code>1.2.0-rc.1</code>, prod에서는 <code>1.2.0</code>이라고 자기를 소개하지만
+    <code>1.3.0-rc.1</code>, prod에서는 <code>1.3.0</code>이라고 자기를 소개하지만
     <strong>이미지는 한 개</strong>다 — 태그만 두 개 붙어 있을 뿐이다.
   </div>
 
@@ -284,81 +357,145 @@ docker run --rm \
   -e APP_ENV=prod \
   -e APP_VERSION="${VERSION}" \
   -e APP_COMMIT="${BUILD_SHA}" \
-  -e APP_DIGEST="${DIGEST}" \
+  -e APP_sha256:dd51881f7da46d859df511e796c39a29d3b0b48741daf68ad9b0f0be184e487f="${sha256:dd51881f7da46d859df511e796c39a29d3b0b48741daf68ad9b0f0be184e487f}" \
   "${IMAGE}:${IMAGE_TAG}"</pre>
 
   <div class="note">
     <strong>복사한 게 아니라 따로 만들었는데 같았다.</strong> prod는 이미지를 <strong>다시 빌드했다.</strong>
-    그 결과 바이트가 UAT 것과 같아서, <code>…:v1.2.0-rc.1</code>과 <code>…:v1.2.0</code>이
-    레지스트리에서 <strong>같은 digest를 가리키는 두 이름</strong>이 됐다.
+    그 결과 바이트가 UAT 것과 같아서 두 태그가 레지스트리에서 같은 digest를 가리키게 됐다.
     태그를 옮겨 단 것이었다면 이 값은 아무것도 증명하지 못한다.
   </div>
-</section>
-
-<section>
-  <div class="num">03</div>
-  <h2>배포 원장 — git 태그가 기록이다</h2>
-  <p>Actions 로그는 90일이면 만료된다. annotated 태그는 영구다. 그래서 “무엇이 어디에 나갔나”를 태그 메시지에 통째로 적는다.</p>
-<pre>$ git show uat-v1.2.0-rc.1
-
-tag uat-v1.2.0-rc.1
-Tagger: github-actions[bot]
-
-UAT deploy — 1.2.0 (rc)
-
-env      : uat
-branch   : release-0818
-commit   : 06681e61180e62af2b3bb1ed1334ca29c1ba3aa0
-image    : ghcr.io/…/git-branch-strategy-sandbox:v1.2.0-rc.1
-digest   : sha256:cd9c4b1c91c9e4206723a80477c5fd11bbf6386d040cab83ee670387155ad59e
-jdk      : Amazon.com Inc. 17.0.20+8-LTS
-gradle   : 8.13
-base     : eclipse-temurin:17-jre
-base-dig : sha256:56cd3dfd4e99fed05a153a717847950a31b83621b62ef25a09f75bc4e5e8b67e
-run      : …/actions/runs/32121255464
-by       : yoonhyuk-jeong
-
-주의: 이 버전은 예보(forecast)다. 재조립으로 범위가 바뀌면 실제 prod 버전이 달라질 수 있고,
-그 불일치는 prod 배포 요약에서 경고로 드러난다.</pre>
   <div class="note">
-    <strong>기록 항목은 사이클을 돌리며 늘어났다.</strong> 처음엔 digest·커밋뿐이었고,
-    <code>jdk</code>/<code>gradle</code>/<code>base-dig</code>는 “고정하지 말고 기록하자”로 방향을 정한 뒤 추가했다.
-    무엇을 왜 기록하는지는 <a href="#drift">05절</a> 참고.
+    <strong>이번 사이클에서 한 번 더 확인됐다.</strong> 조립 방식을 고쳐(<code>--no-ff</code>) release를 다시 만들자
+    커밋이 <code>4dd91ac</code> → <code>4448e5a</code>로 바뀌었다. <strong>digest는 <code>dd51881f…</code> 그대로였다.</strong>
+    커밋 그래프가 달라져도 트리가 같으면 산출물이 같다.
   </div>
 </section>
 
 <section>
   <div class="num">04</div>
-  <h2>이번 런이 증명하지 않은 것</h2>
-  <p>이 런의 목적은 <strong>digest 추적 하나</strong>였다. v4 브랜치 플로우 자체는 여기서 돌리지 않았다.
-     섞어 읽지 않도록 빠진 것을 적어 둔다.</p>
-  <table>
-    <thead><tr><th>항목</th><th>이번 런</th><th>어디서 검증했나</th></tr></thead>
-    <tbody>
-      <tr><td>test 환경 배포</td>
-          <td><strong style="color:var(--fg-warn)">0회</strong> — PR #1로 test에 merge만 하고 dispatch는 돌리지 않았다</td>
-          <td><a href="./cycle-0818.html">0818 사이클 (개인 레포)</a></td></tr>
-      <tr><td>조립 PR 1건</td>
-          <td><strong style="color:var(--fg-warn)">없음</strong> — 기능이 1개라 <code>assemble/</code> 없이 feature → master로 바로 PR했다</td>
-          <td><a href="./cycle-0818.html">0818 사이클 (개인 레포)</a></td></tr>
-      <tr><td>칸반 (대기·추월)</td>
-          <td><strong style="color:var(--fg-warn)">없음</strong> — 기능 1개(IMTDEV-4004 json-export)</td>
-          <td><a href="./cycle-0818.html">0818 사이클 (개인 레포)</a></td></tr>
-      <tr><td>rerere 자동 재적용</td>
-          <td><strong style="color:var(--fg-warn)">없음</strong> — 기능이 1개라 충돌 자체가 나지 않았다</td>
-          <td><a href="./cycle-0818.html">0818 사이클 (개인 레포)</a></td></tr>
-    </tbody>
-  </table>
+  <h2>조립 PR 1건 = 배포 1회</h2>
+  <p>v4에서 prod 트리거는 <code>pull_request closed(merged)</code>다. 그래서 feature별로 PR을 따로 올리면
+     <strong>배포가 N회</strong> 돈다. 묶음 배포는 조립 브랜치를 만들어 <strong>PR 1건</strong>으로 올린다.</p>
+  <div class="cards">
+    <div class="card">
+      <h4>merge 직전</h4>
+      <pre>$ gh run list --workflow=prod-build-deploy.yml | wc -l
+1</pre>
+    </div>
+    <div class="card">
+      <h4>PR #6 merge 직후</h4>
+      <pre>$ gh run list --workflow=prod-build-deploy.yml | wc -l
+2      ← 정확히 1회만 증가</pre>
+    </div>
+  </div>
+  <p>조립 PR은 feature 2개를 담았지만 배포는 1회였다.
+     <code>concurrency</code>는 동시 실행을 줄 세울 뿐 <strong>횟수를 줄이지 않는다</strong> —
+     그래서 “PR 1건” 자체가 규칙이어야 한다.</p>
+
+  <h3>정합성 검증 (v4 4.1절)</h3>
+  <p>조립 브랜치는 <code>release-0819</code>와 <strong>내용이 같아야</strong> 한다. 다르면 충돌을 다르게 푼 것이다.</p>
+<pre>$ git diff release-0819 assemble/0819
+(출력 없음)
+
+$ git rev-parse release-0819^{tree} assemble/0819^{tree}
+6b506c2e254f2bd1704933eb53afd5c1e5ab5fcd
+6b506c2e254f2bd1704933eb53afd5c1e5ab5fcd     ← 동일</pre>
   <div class="note">
-    <strong>왜 축약해서 돌렸나.</strong> v4 플로우는 개인 레포에서 이미 3개 기능으로 끝까지 돌려 뒀다.
-    조직 레포로 옮긴 목적은 <strong>jar <code>sha256sum</code>이 아니라 진짜 OCI digest로</strong>
-    같은 주장을 다시 세우는 것이었고, 그건 기능 1개로 충분하다.
-    두 축을 합친 런은 아직 돌리지 않았다.
+    <strong>merge commit 가드도 돌았다.</strong> prod 워크플로가 master tip의 부모 수를 세어
+    Squash/Rebase merge를 잡아낸다. 레포 설정에서도 Squash/Rebase를 비활성화해 뒀다(<a href="#setup">09절</a>).
+<pre>✅ merge commit (부모 2개) — same-SHA 유지
+✅ digest 일치 — UAT(uat-v1.3.0-rc.1)에서 검증한 이미지가 그대로 나간다</pre>
   </div>
 </section>
 
 <section>
-  <div class="num" id="drift">05</div>
+  <div class="num">05</div>
+  <h2>충돌은 한 번만 풀었다</h2>
+  <p><code>FeatureRegistry.register()</code>는 <strong>의도된 충돌 지점</strong>이다. 세 기능이 모두 같은 자리에
+     한 줄씩 추가하므로 반드시 부딪힌다. v4는 같은 feature를 목적지마다 따로 merge하므로,
+     “그러면 충돌도 목적지 수만큼 푸는 거냐”가 가장 흔한 반박이다.</p>
+  <table>
+    <thead><tr><th>merge</th><th>목적지</th><th>충돌 처리</th></tr></thead>
+    <tbody>
+      <tr><td>4006 ← 첫 충돌</td><td class="mono">dev</td><td><strong>사람이 해결</strong> (1회)</td></tr>
+      <tr><td>4006</td><td class="mono">test (PR #4)</td><td><span class="tick">✓</span> rerere 자동 재적용</td></tr>
+      <tr><td>4006</td><td class="mono">release-0819</td><td><span class="tick">✓</span> rerere 자동 재적용</td></tr>
+      <tr><td>4006</td><td class="mono">assemble/0819</td><td><span class="tick">✓</span> rerere 자동 재적용</td></tr>
+    </tbody>
+  </table>
+<pre>CONFLICT (content): Merge conflict in .../com/ti/FeatureRegistry.java
+Resolved '.../FeatureRegistry.java' using previous resolution.</pre>
+  <p>사람이 푼 건 <strong>1회</strong>고 나머지 3곳은 자동이었다. 그 결과가 같은지는 느낌이 아니라
+     <strong>tree SHA 일치</strong>로 확인된다(04절).</p>
+
+  <div class="note">
+    <strong>그래서 충돌 PR은 GitHub 버튼으로 못 닫는다.</strong> rerere 캐시는 클론 로컬에만 있어
+    GitHub 서버가 쓸 수 없다. PR #4·#5는 실제로 이렇게 막혔다.
+<pre>$ gh pr view 4 --json mergeable,mergeStateStatus
+mergeable=CONFLICTING   state=DIRTY
+
+$ gh pr merge 4 --merge
+X not mergeable: the merge commit cannot be cleanly created.</pre>
+    로컬에서 풀어 push하면 GitHub이 그 PR을 <strong>MERGED로 자동 처리</strong>한다.
+    이것이 v4에 “한 기능의 merge는 담당자가 4곳 다 한다”는 규칙이 있는 이유다 —
+    <code>.git/rr-cache/</code>는 <strong>push·pull로 전파되지 않는다.</strong>
+  </div>
+</section>
+
+<section>
+  <div class="num">06</div>
+  <h2>배포 원장 — git 태그가 기록이다</h2>
+  <p>Actions 로그는 90일이면 만료된다. annotated 태그는 영구다. 그래서 “무엇이 어디에 나갔나”를 태그 메시지에 통째로 적는다.</p>
+<pre>$ git show uat-v1.3.0-rc.1
+
+tag uat-v1.3.0-rc.1
+Tagger: github-actions[bot]
+
+UAT deploy — 1.3.0 (rc)
+
+env      : uat
+branch   : release-0819
+commit   : 4448e5ae0f5122d45d39aa0dca807e92e5a9da35
+image    : ghcr.io/…/git-branch-strategy-sandbox:v1.3.0-rc.1
+digest   : sha256:dd51881f7da46d859df511e796c39a29d3b0b48741daf68ad9b0f0be184e487f
+jdk      : Amazon.com Inc. 17.0.20.1+10-LTS
+gradle   : 8.13
+base     : eclipse-temurin:17-jre
+base-dig : sha256:cbc584b3776ab71410502680e6e85b5f1cd18c92c7bd680c10bc2a40bf678558
+run      : …/actions/runs/32219194429
+by       : yoonhyuk-jeong
+
+주의: 이 버전은 예보(forecast)다. 재조립으로 범위가 바뀌면 실제 prod 버전이 달라질 수 있고,
+그 불일치는 prod 배포 요약에서 경고로 드러난다.</pre>
+</section>
+
+<section>
+  <div class="num">07</div>
+  <h2>기록해 둔 값이 실제로 움직였다</h2>
+  <p>빌드 입력을 고정하지 않고 <strong>기록</strong>하기로 한 설계가 이번에 처음으로 값을 했다.
+     0818 사이클과 비교하면 <strong>두 개가 움직였다.</strong></p>
+  <table>
+    <thead><tr><th>입력</th><th>0818 사이클</th><th>0819 사이클</th></tr></thead>
+    <tbody>
+      <tr><td>빌드 JDK</td><td class="mono">17.0.20+8-LTS</td>
+          <td class="mono"><strong style="color:var(--fg-warn)">17.0.20.1+10-LTS</strong></td></tr>
+      <tr><td>base 이미지 digest</td><td class="mono">sha256:56cd3dfd…</td>
+          <td class="mono"><strong style="color:var(--fg-warn)">sha256:cbc584b3…</strong></td></tr>
+      <tr><td>Gradle</td><td class="mono">8.13</td><td class="mono">8.13</td></tr>
+    </tbody>
+  </table>
+  <div class="note">
+    <strong>이게 왜 중요한가.</strong> 사이클 안에서는 UAT와 prod가 몇 분 차이라 같은 값으로 빌드된다 —
+    그래서 digest가 맞았다. 그런데 <strong>사이클 사이에는 움직인다.</strong>
+    만약 UAT와 prod 사이에 JDK가 바뀌었다면 digest가 어긋났을 것이고,
+    배포 원장에 두 값이 남아 있으므로 <strong>무엇이 움직였는지 지목할 수 있다.</strong>
+    고정(prevention)이 아니라 감지(detection)를 택한 이유가 이것이다.
+  </div>
+</section>
+
+<section>
+  <div class="num" id="drift">08</div>
   <h2>샌드박스와 실전의 차이</h2>
   <p>샌드박스는 조직 레포에 올려 실전과 최대한 같은 조건으로 맞췄다.
      남은 차이는 <strong>두 줄뿐</strong>이고, 둘 다 이유가 분명하다.</p>
@@ -419,9 +556,8 @@ by       : yoonhyuk-jeong
     digest가 갈리는 것은 <strong>결함이 아니라 측정값</strong>이다 — 갈렸다는 사실과 그 원인이 곧 알아야 할 정보다.
   </div>
 </section>
-
 <section>
-  <div class="num">06</div>
+  <div class="num" id="setup">09</div>
   <h2>v4를 켜려면 레포 설정 3개를 바꿔야 한다</h2>
   <p>샌드박스를 실전 설정으로 맞춰 보고 알았다. 지금 <code>image-trial-server</code> 설정은
      <strong>v4와 정면으로 충돌한다.</strong></p>
@@ -481,13 +617,42 @@ by       : yoonhyuk-jeong
     App 시크릿이 준비되면 <code>to-be</code>로 넘어간다 — 위 표의 3개 설정은 세 프로필 모두 동일하다.
   </div>
 </section>
+<section>
+  <div class="num">10</div>
+  <h2>이번 사이클에서 문서를 고칠 것</h2>
+  <p>샌드박스의 산출물은 배포가 아니라 <strong>문서 교정</strong>이다. 이번에 한 건 나왔다.</p>
+  <div class="cards">
+    <div class="card finding">
+      <h4>F5 — orphan 검출 명령이 배포 전에는 거짓 양성을 낸다</h4>
+      <p>4.1절 배포 전 체크에 적힌 명령을 그대로 돌리면 정상 사이클에서도 2건이 잡혔다.
+         release 직접 커밋이 아니라 <strong>feature 커밋 그 자체</strong>였다 —
+         배포 전이라 master가 아직 안 받았으니 당연히 걸린다.</p>
+<pre># 문서 (배포 전에 쓰면 거짓 양성)
+git log release-0819 --not master --no-merges
+  cb83251 feat: IMTDEV-4005 …      ← feature 커밋
+  692eaf6 feat: IMTDEV-4006 …      ← feature 커밋
+
+# 교정 — 이번 배포분 feature 도 제외한다
+git log release-0819 --not master &lt;feature들&gt; --no-merges
+  (출력 없음)  ✓</pre>
+      <p style="margin-top:10px">교정본으로 release에 직접 커밋을 하나 만들어 재실행하니 <strong>그것만</strong> 잡혔다.
+         <strong>경고가 늘 뜨면 아무도 안 본다</strong> — 그래서 이건 고쳐야 한다.
+         <code>/imt-status</code> 스캔도 같이 교정했다(<code>release-</code> 브랜치 누락 + 규칙 번호 7→6).</p>
+    </div>
+  </div>
+  <div class="note">
+    아직 미검증: <strong>S3</strong>(4.5절 제외 후 <code>-v2</code> 재조립) ·
+    <strong>S5</strong>(금지 규칙 거부 반응) · <strong>S6</strong>(hotfix) · <strong>S7</strong>(test 리셋).
+    체크리스트와 근거는 샌드박스 레포의 <code>TESTING_V4.md</code>에 있다.
+  </div>
+</section>
 
 <footer>
-  실행: 2026-08-18 · 실행 환경 <code>trial-informatics/git-branch-strategy-sandbox</code> (조직 레포, private) ·
+  실행: 2026-08-19 · 실행 환경 <code>trial-informatics/git-branch-strategy-sandbox</code> (조직 레포, private) ·
   이 페이지는 <strong>공개용 사본</strong>이다 — 사내 운영 수치는 제외했다 ·
-  규칙 원본은 <a href="https://trialinformatics.atlassian.net/wiki/spaces/ImageTrial/pages/716800002">Confluence — IMT Git Branch 전략 v4</a> ·
+  규칙 원본은 <a href="https://trialinformatics.atlassian.net/wiki/spaces/ImageTrial/pages/716800002/IMT+Git+Branch+v4">Confluence — IMT Git Branch 전략 v4</a> ·
   <a href="./v4-flow.html">v4 전략 시각 설명 →</a> ·
-  <a href="./cycle-0818.html">0818 사이클 실행 기록 →</a>
+  <a href="./cycle-0818.html">부록: 0818 개인 레포 런 →</a>
 </footer>
 
 </div>
@@ -506,6 +671,22 @@ by       : yoonhyuk-jeong
     root.setAttribute('data-theme', next);
     try { localStorage.setItem('theme', next); } catch(e) {}
   });
+
+  // 커밋 그래프에 기능별 색을 입힌다 (색 단독이 아니라 텍스트와 함께 — 접근성)
+  var map = [
+    [/(IMTDEV-4005[^\s]*|retry-policy)/g, 'featA'],
+    [/(IMTDEV-4006[^\s]*|xml-export)/g, 'featB'],
+    [/(IMTDEV-4007[^\s]*|timeout-guard)/g, 'featC']
+  ];
+  var pre = document.getElementById('rawgraph');
+  if (!pre) return;
+  var h = pre.textContent
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  map.forEach(function(m){
+    h = h.replace(m[0], '<span style="color:var(--'+m[1]+');font-weight:600">$1</span>');
+  });
+  h = h.replace(/(tag: v[0-9.]+)/g, '<span style="color:var(--good);font-weight:700">$1</span>');
+  pre.innerHTML = h;
 })();
 </script>
 </body>
