@@ -46,15 +46,16 @@
        <span class="tag">Confluence v4 확정본의 시각화</span></p>
   </a>
 
-  <a class="card" href="./cycle-0819.html">
+  <a class="card" href="./verification.html">
     <span class="num">02 — 실행 기록</span>
-    <h2>0819 사이클 실행 기록 →</h2>
+    <h2>조직 샌드박스 검증 기록 →</h2>
     <p>기능 3개를 만들어 <b>2개만 배포</b>하고 1개는 test에 남긴 한 사이클.
        dev·test·uat·prod 4개 환경이 모두 실제로 배포됐고,
        <b>UAT에서 검증한 컨테이너 이미지가 그대로 prod에 나갔다</b>는 것을 OCI digest로 증명했다.
        조립 PR 1건이 배포를 정확히 1회만 돌린 것, 충돌을 한 번 풀어 3곳에 자동 재적용된 것,
-       <b>test를 통째로 버리고 다시 만들어도 기능의 SHA가 보존되는 것</b>까지 실측했다.<br>
-       <span class="tag">조직 샌드박스 · v1.3.0</span></p>
+       test를 통째로 버리고 다시 만들어도 기능의 SHA가 보존되는 것, <b>UAT 통과분에서 기능을 빼면
+       재검증 없이는 내보낼 수 없다는 것</b>까지 실측했다. 문서 교정 3건이 여기서 나왔다.<br>
+       <span class="tag">조직 샌드박스 · 사이클 2회 · v1.3.0 → v1.4.0</span></p>
   </a>
 
   <p class="appendix">부록 —

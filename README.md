@@ -10,7 +10,7 @@
 | --- | --- |
 | [`index.html`](docs/index.html) | 허브 |
 | [`v4-flow.html`](docs/v4-flow.html) | **① 규칙** — 전략 시각 설명. 4개 독립 목적지, 조립 PR, 금지 규칙 10개, `/imt-*` 커맨드 |
-| [`cycle-0819.html`](docs/cycle-0819.html) | **② 실행 기록** — 0819 사이클. 조직 샌드박스에서 실행 (v1.3.0) |
+| [`verification.html`](docs/verification.html) | **② 실행 기록** — 조직 샌드박스에서 v4 를 검증한 기록 (사이클 2회 + test 리셋, v1.3.0 → v1.4.0) |
 | [`cycle-0818.html`](docs/cycle-0818.html) | 부록 — 0818 사이클. **이 레포에서 실행** (조직 이관 전) |
 
 ## 히스토리를 남겨 둔 이유

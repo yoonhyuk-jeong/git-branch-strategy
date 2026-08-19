@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>0819 사이클 실행 기록 — IMT Git Branch v4 + 버전/digest 추적</title>
+<title>조직 샌드박스 검증 기록 — IMT Git Branch v4 + 버전/digest 추적</title>
 <style>
   :root{
     color-scheme: light;
@@ -173,7 +173,7 @@
 
 <header>
   <div class="hbar">
-    <div class="brand">0819 사이클 실행 기록 <span>· 조직 샌드박스</span></div>
+    <div class="brand">v4 검증 기록 <span>· 조직 샌드박스 · 0819~0820</span></div>
     <div class="spacer"></div>
     <button class="btn" id="theme">라이트 / 다크</button>
   </div>
@@ -182,7 +182,7 @@
 <div class="wrap">
 
 <div class="hero">
-  <div class="kicker">2026-08-19 · trial-informatics 조직 레포 · 실제 GitHub Actions 실행</div>
+  <div class="kicker">2026-08-19 · trial-informatics 조직 레포 · 사이클 2회 + test 리셋 · 실제 GitHub Actions 실행</div>
   <h1>기능 3개 중 2개만 배포했고,<br>UAT에서 검증한 그 이미지가 그대로 나갔다.</h1>
   <p class="lead">
     IMT Git Branch 전략 v4에 <strong>버전·digest 추적</strong>을 얹어 한 사이클을 끝까지 돌렸다.
@@ -686,9 +686,76 @@ $ git cherry-pick a52d5e6</pre>
 </section>
 
 <section>
-  <div class="num" id="fixes">11</div>
-  <h2>이번에 문서를 고칠 것</h2>
-  <p>샌드박스의 산출물은 배포가 아니라 <strong>문서 교정</strong>이다. 이번에 두 건 나왔다.</p>
+  <div class="num" id="c0820">11</div>
+  <h2>다음 사이클(0820) — 배포에서 빼기, 그리고 hotfix</h2>
+  <p>0819 는 “계획대로 흘러간 사이클”이었다. 실전에서 어려운 건 <strong>계획이 어긋날 때</strong>다.
+     그래서 하루 뒤 두 가지를 일부러 만들었다 — <strong>UAT 통과분에서 기능을 빼는 것</strong>과
+     <strong>hotfix 가 끼어드는 것</strong>.</p>
+
+  <table>
+    <thead><tr><th>#</th><th>한 일</th><th>결과</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><code>release-0820</code> ← A(feat) + B(fix) → UAT</td><td class="mono">uat-v1.4.0-rc.1 / 4f344c38…</td></tr>
+      <tr><td>2</td><td><code>hotfix/</code> → master PR → prod <strong>(test 우회)</strong></td><td class="mono">v1.3.1</td></tr>
+      <tr><td>3</td><td><strong>forward merge 일부러 생략</strong></td><td>판독 오염 재현</td></tr>
+      <tr><td>4</td><td><strong>B 를 배포에서 제외</strong> → <code>release-0820-v2</code> ← A 만 → UAT 재검증</td><td class="mono">uat-v1.4.0-rc.2 / 26a660ef…</td></tr>
+      <tr><td>5</td><td>fast path(단건) PR → prod</td><td class="mono">v1.4.0 · prod 실행 3→4</td></tr>
+    </tbody>
+  </table>
+
+  <h3>기능을 빼면 UAT 를 다시 받아야 한다 (4.5절)</h3>
+  <p>UAT 는 <code>master + A + B</code> 를 봤다. B 를 빼면 prod 에 뜰 것은 <code>master + A</code> 인데
+     <strong>그 조합은 검증된 적이 없다.</strong> 그래서 <code>-v2</code> 를 master 에서 새로 만들어
+     A 만 담고 UAT 를 다시 통과시켰다.</p>
+  <div class="note">
+    <strong>digest 가 실제로 달라졌다.</strong> 이게 “재검증 없이 내보내면 안 되는” 이유의 가장 직관적인 증거다.
+<pre>uat-v1.4.0-rc.1  (A+B)   sha256:4f344c38…
+uat-v1.4.0-rc.2  (A 만)   sha256:26a660ef…   ← 다른 산출물이다</pre>
+    <code>-v2</code> 를 master 에서 새로 만들었으므로 그동안 나간 hotfix 도 자동으로 들어왔다 —
+    <strong>재조립이 forward merge 를 겸한다.</strong>
+  </div>
+
+  <h3>forward merge 를 빼먹으면 4.1절 판독이 무력해진다</h3>
+  <p>hotfix 를 배포하고 열린 <code>release-0820</code> 에 master 를 반영하지 않은 채 정합성 diff 를 보면
+     <strong>내 배포분과 남의 hotfix 가 한 화면에 섞인다.</strong></p>
+  <div class="cards">
+    <div class="card finding">
+      <h4>forward merge 전 — 판독 불가</h4>
+<pre>$ git diff release-0820 master
+ FeatureRegistry.java        | 3 +--
+ AuditLog.java               | 8 ++++++++   ← hotfix (무관)
+ SessionTimeout.java         | 15 -------   ← 제외분 B
+ version.yml / CHANGELOG.md  | …            ← 릴리스 뒤처리</pre>
+      <p>“이 중 무엇이 내 배포분인가”를 구분할 수 없다.</p>
+    </div>
+    <div class="card">
+      <h4><span class="tick">✓</span> forward merge 후 — 제외분만</h4>
+<pre>$ git diff release-0820 master \
+    -- . ':!version.yml' ':!CHANGELOG.md'
+ FeatureRegistry.java  | 1 -
+ SessionTimeout.java   | 15 ------      ← 제외분 B 만</pre>
+      <p>“의도적 제외”로 명확히 읽힌다.</p>
+    </div>
+  </div>
+
+  <div class="note">
+    <strong>가드는 dispatch 시점에만 돈다.</strong> hotfix 반영 후 낡은 <code>release-0820</code> 으로
+    UAT 를 다시 돌리니 워크플로가 막았다 — <code>::error title=낡은 소스</code>.
+    그런데 <strong>이미 UAT 를 통과한 뒤 배포로 직행하면 가드가 다시 돌지 않는다.</strong>
+    그 구간의 유일한 신호가 4.1절 diff 다. <strong>이것이 forward merge 를 의무로 둔 실질적 근거다.</strong>
+  </div>
+
+  <div class="note">
+    <strong>단건은 조립 브랜치를 만들지 않는다(fast path).</strong> 3절 규칙대로 feature 를 그대로
+    master 로 PR 했고, prod 실행은 3회 → 4회로 <strong>정확히 1회만</strong> 늘었다.
+    prod 앱 출력에 제외한 <code>session-timeout</code> 은 없고, <code>test</code> tip 에는 남아 있다.
+  </div>
+</section>
+
+<section>
+  <div class="num" id="fixes">12</div>
+  <h2>문서를 고칠 것</h2>
+  <p>샌드박스의 산출물은 배포가 아니라 <strong>문서 교정</strong>이다. 세 건 나왔다.</p>
   <div class="cards">
     <div class="card finding">
       <h4>F5 — orphan 검출 명령이 배포 전에는 거짓 양성을 낸다</h4>
@@ -706,6 +773,24 @@ git log release-0819 --not master &lt;feature들&gt; --no-merges
       <p style="margin-top:10px">교정본으로 release에 직접 커밋을 하나 만들어 재실행하니 <strong>그것만</strong> 잡혔다.
          <strong>경고가 늘 뜨면 아무도 안 본다</strong> — 그래서 이건 고쳐야 한다.
          <code>/imt-status</code> 스캔도 같이 교정했다(<code>release-</code> 브랜치 누락 + 규칙 번호 7→6).</p>
+    </div>
+    <div class="card finding">
+      <h4>F8 — 4.1절 정합성 diff 는 어느 시점에도 “비어 있음”을 낼 수 없다</h4>
+      <p>문서는 <code>git diff release-{날짜} master</code> 가 비면 안전이라고 한다. 그런데
+         <strong>빌 시점이 없다.</strong> 배포 전에는 master 에 배포분이 없으니 배포분 전체가 뜨고,
+         배포 후에는 prod 가 태그 뒤에 붙이는 <code>chore(release)</code> 때문에
+         <code>version.yml</code>·<code>CHANGELOG.md</code> 가 뜬다.</p>
+<pre># 배포 후 실측
+$ git diff release-0820-v2 master --stat
+ CHANGELOG.md | 3 +++
+ version.yml  | 2 +-</pre>
+      <p style="margin-top:10px">교정은 두 갈래다. <strong>배포 전이라면 비교 대상이 master 가 아니라 조립 결과물</strong>이고
+         (0819 에서 실제로 유용했던 것은 <code>git diff release-0819 assemble/0819</code> → 0줄),
+         <strong>배포 후 사후 확인이라면 릴리스 뒤처리 파일을 제외</strong>한다. 교정본으로 판독하니 처음으로 비었다.</p>
+<pre>git diff release-{MMDD} assemble/{MMDD}
+git diff release-{MMDD} master -- . ':!version.yml' ':!CHANGELOG.md'</pre>
+      <p style="margin-top:10px">F5 와 같은 실패 양식이다 — <strong>늘 뜨는 경고는 읽히지 않는다.</strong>
+         3종 판독이 실제로 구분되려면 이 교정이 필요하다.</p>
     </div>
     <div class="card finding">
       <h4>F6 — 7절 리셋 절차를 v4 설정대로는 실행할 수 없다</h4>
@@ -727,9 +812,13 @@ git log release-0819 --not master &lt;feature들&gt; --no-merges
   </div>
 
   <div class="note">
-    아직 미검증: <strong>S3</strong>(4.5절 제외 후 <code>-v2</code> 재조립) ·
-    <strong>S5</strong>(금지 규칙 거부 반응) · <strong>S6</strong>(hotfix).
+    아직 미검증은 <strong>S5</strong>(금지 규칙이 실제로 막히는지) 하나다.
+    도구 층은 규칙을 다 읽은 세션에서 시험하면 증거력이 없고, 설정 층(Squash 버튼 없음)은
+    레포 설정과 PR 6건이 전부 merge commit 으로 닫힌 것으로 부분 확인됐다.
     체크리스트와 근거는 샌드박스 레포의 <code>TESTING_V4.md</code>에 있다.
+    <br><br><strong>철회한 것도 적어 둔다.</strong> 4.5절 독립성 판정 명령이 틀렸다고 한 번 보고했으나
+    오검이었다 — 문서는 세 점(<code>master...feature</code>)을 써서 이미 merge-base 기준인데
+    검증할 때 두 점으로 바꿔 실행한 것이 원인이었다.
   </div>
 </section>
 
