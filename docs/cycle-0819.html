@@ -619,8 +619,76 @@ by       : yoonhyuk-jeong
 </section>
 <section>
   <div class="num">10</div>
-  <h2>이번 사이클에서 문서를 고칠 것</h2>
-  <p>샌드박스의 산출물은 배포가 아니라 <strong>문서 교정</strong>이다. 이번에 한 건 나왔다.</p>
+  <h2>test는 버려도 되는 브랜치인가</h2>
+  <p>v4에서 <code>test</code>는 <strong>배포 대기실</strong>이다. 기능이 쌓였다 빠지기를 반복하므로
+     오래 두면 읽을 수 없게 된다. 그래서 7절에 <strong>버리고 다시 만드는 절차</strong>가 있다.
+     이번 사이클 직후 실제로 실행해 봤다.</p>
+
+  <p>0818·0819 두 사이클분이 쌓여 <code>test</code>는 master 대비 merge가 <strong>15개</strong>였다.
+     그런데 실제로 대기 중인 기능은 <strong>3개</strong>뿐이었다 — 나머지는 이미 배포된 것들의 흔적과
+     forward merge다. 여기에 금지 규칙 6 위반(<code>test</code> 직접 커밋)을 하나 심고 리셋했다.</p>
+
+  <table>
+    <thead><tr><th></th><th>리셋 전</th><th>리셋 후</th></tr></thead>
+    <tbody>
+      <tr><td>master 대비 merge</td><td class="mono">15</td><td class="mono"><strong>3</strong></td></tr>
+      <tr><td>대기 기능</td><td class="mono">3</td><td class="mono">3 <strong>(SHA 동일)</strong></td></tr>
+      <tr><td>orphan (직접 커밋)</td><td class="mono">1</td><td class="mono"><strong>0 — 소실</strong></td></tr>
+    </tbody>
+  </table>
+
+  <p>절차는 네 단계다 — <strong>archive tag → orphan 검출 → <code>reset --hard origin/master</code> →
+     원본 feature에서 재병합.</strong></p>
+
+  <div class="cards">
+    <div class="card">
+      <h4><span class="tick">✓</span> SHA가 보존됐다</h4>
+      <p>대기 기능 3개의 커밋 SHA가 리셋 전후 <strong>완전히 같다.</strong> 사본이 아니라
+         원본 feature 브랜치에서 다시 merge했으므로, 목적지를 통째로 버려도 기능의 정체성은 남는다.
+         <strong>same-SHA 모델이 리셋을 견딘다</strong> — 7절의 전제가 성립한다.</p>
+      <pre>0ee8f36  IMTDEV-4007   ← 리셋 전후 동일
+bc06ce4  IMTDEV-4008   ← 동일
+707281c  IMTDEV-4009   ← 동일</pre>
+    </div>
+    <div class="card finding">
+      <h4>직접 커밋은 소실됐다 — 금지 규칙 6의 근거</h4>
+      <p>리셋 후 <code>a52d5e6</code>을 담은 브랜치가 <strong>하나도 없다.</strong> archive 태그에만
+         남았고, 태그를 지우면 GC 대상이다. “<code>test</code>에 직접 커밋하지 말라”가
+         지금까지 말로만 적혀 있었는데, 이게 실측 근거다.</p>
+      <pre>$ git branch -r --contains a52d5e6
+(없음)
+$ git tag --contains a52d5e6
+archive/test-20260819</pre>
+    </div>
+    <div class="card">
+      <h4><span class="tick">✓</span> orphan 검출이 그것만 골라냈다</h4>
+      <p>리셋 전에 돌린 검출 명령(<a href="#fixes">11절 F5</a> 교정본)이 정확히 그 한 커밋을 잡았고,
+         <code>--contains</code>가 <code>origin/test</code>만 반환해 <strong>확정 orphan</strong>으로 판정됐다.
+         버리기 전에 무엇을 잃는지 알 수 있다는 뜻이다.</p>
+    </div>
+    <div class="card">
+      <h4><span class="tick">✓</span> 재구성된 test가 정상 동작한다</h4>
+      <p>빌드 성공, 기능 9개 등록 확인, test 환경 dispatch <code>success</code>(<code>625b3c8</code>).
+         재병합 충돌 2건은 <strong>rerere가 자동 해결</strong>했다 — 리셋 비용이 그만큼 낮아진다.</p>
+    </div>
+  </div>
+
+  <div class="note">
+    <strong>“소실”은 회수 불가가 아니다.</strong> archive 태그가 가리키고 있으므로 내용은 읽을 수 있다.
+    제대로 살리려면 master에서 feature 브랜치를 파고 cherry-pick해 정상 경로로 되돌린다 —
+    <strong>그게 애초에 했어야 할 일</strong>이다.
+<pre>$ git show archive/test-20260819:.../Main.java | grep 'QA 지적'
+    // QA 지적 급수정 (test 직접 커밋 — 금지규칙 6 위반 재현)
+
+$ git checkout -b 0820/YH/IMTDEV-XXXX-qa-fix origin/master
+$ git cherry-pick a52d5e6</pre>
+  </div>
+</section>
+
+<section>
+  <div class="num" id="fixes">11</div>
+  <h2>이번에 문서를 고칠 것</h2>
+  <p>샌드박스의 산출물은 배포가 아니라 <strong>문서 교정</strong>이다. 이번에 두 건 나왔다.</p>
   <div class="cards">
     <div class="card finding">
       <h4>F5 — orphan 검출 명령이 배포 전에는 거짓 양성을 낸다</h4>
@@ -639,10 +707,28 @@ git log release-0819 --not master &lt;feature들&gt; --no-merges
          <strong>경고가 늘 뜨면 아무도 안 본다</strong> — 그래서 이건 고쳐야 한다.
          <code>/imt-status</code> 스캔도 같이 교정했다(<code>release-</code> 브랜치 누락 + 규칙 번호 7→6).</p>
     </div>
+    <div class="card finding">
+      <h4>F6 — 7절 리셋 절차를 v4 설정대로는 실행할 수 없다</h4>
+      <p>리셋은 non-fast-forward라 <strong>force push</strong>가 필요하다. 그런데 v4 목표 설정은
+         <code>test</code>에 <code>allow_force_pushes: false</code>를 걸고,
+         <code>allow_deletions: false</code>라 브랜치 삭제 후 재생성 우회도 막는다.
+         <strong>절차와 설정이 서로 모순된다.</strong></p>
+<pre>$ git push -f origin test:refs/heads/test
+ ! [remote rejected] test -> test (protected branch hook declined)</pre>
+      <p style="margin-top:10px"><strong>관리자도 우회하지 못한다.</strong>
+         <code>enforce_admins: false</code>는 <em>PR 요구만</em> 면제한다 —
+         앞선 merge push들은 <code>Bypassed rule violations</code>로 통과했는데 force push는 거부됐다.</p>
+      <p>→ 7절에 <strong>보호 일시 해제 / 원복 단계</strong>를 명시하고,
+         사람이 JSON을 손으로 만들지 않게 스크립트에 넣었다.
+         <strong>되돌리기를 잊으면 <code>test</code>가 무방비로 남으므로</strong> 원복 확인 명령도 함께 적는다.</p>
+<pre>./scripts/repo-settings.sh unlock-test   # 리셋 전
+./scripts/repo-settings.sh lock-test     # 리셋 후 — 반드시</pre>
+    </div>
   </div>
+
   <div class="note">
     아직 미검증: <strong>S3</strong>(4.5절 제외 후 <code>-v2</code> 재조립) ·
-    <strong>S5</strong>(금지 규칙 거부 반응) · <strong>S6</strong>(hotfix) · <strong>S7</strong>(test 리셋).
+    <strong>S5</strong>(금지 규칙 거부 반응) · <strong>S6</strong>(hotfix).
     체크리스트와 근거는 샌드박스 레포의 <code>TESTING_V4.md</code>에 있다.
   </div>
 </section>
