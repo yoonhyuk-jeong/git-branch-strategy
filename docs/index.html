@@ -22,6 +22,8 @@
   a.card:hover{border-color:var(--accent)}
   a.card h2{margin:0 0 6px;font-size:17px;color:var(--accent)}
   a.card p{margin:0;font-size:13.5px;color:var(--ink-2);line-height:1.6}
+  .tag{display:inline-block;margin-top:8px;font-size:11.5px;color:var(--muted);
+       border:1px solid var(--border);border-radius:999px;padding:2px 9px}
   footer{margin-top:34px;font-size:12.5px;color:var(--muted)}
   footer a{color:var(--accent)}
 </style>
@@ -29,7 +31,8 @@
 <body>
 <div class="wrap">
   <h1>IMT Git Branch 전략 v4</h1>
-  <p class="sub">브랜치·merge·배포 플로우와 버전/digest 추적에 대한 시각 자료.</p>
+  <p class="sub">브랜치·merge·배포 플로우와 버전/digest 추적에 대한 시각 자료.<br>
+     실행 기록은 <b>어느 레포에서 돌린 것인지</b>에 따라 두 장으로 나뉜다.</p>
 
   <a class="card" href="./v4-flow.html">
     <h2>전략 시각 설명 →</h2>
@@ -39,8 +42,16 @@
 
   <a class="card" href="./cycle-0818.html">
     <h2>0818 사이클 실행 기록 →</h2>
-    <p>feature 생성부터 prod 배포까지 한 사이클을 샌드박스에서 실제로 돌린 결과.
-       UAT와 prod의 digest가 같다는 것을 증명했고, 실전에 영향 있는 발견 2건이 나왔다.</p>
+    <p>feature 생성부터 prod 배포까지 <b>한 사이클을 통째로</b> 돌린 결과.
+       기능 3개로 칸반(대기·추월) · 조립 PR 1건 · rerere 자동 재적용 · 커밋 그래프를 확인했다.
+       <span class="tag">개인 레포 실행분</span></p>
+  </a>
+
+  <a class="card" href="./verify-digest.html">
+    <h2>digest 동일성 검증 →</h2>
+    <p>UAT에서 검증한 <b>그 컨테이너 이미지가 그대로 prod에 나갔다</b>는 것을 실제 OCI digest로 증명.
+       레포 설정 3개를 바꿔야 v4가 켜진다는 것도 여기서 나왔다.
+       <span class="tag">조직 샌드박스 실행분</span></p>
   </a>
 
   <footer>

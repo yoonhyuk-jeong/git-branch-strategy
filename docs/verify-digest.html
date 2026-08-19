@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>digest 동일성 검증 (조직 샌드박스) — IMT Git Branch v4</title>
+<style>
+  :root{
+    color-scheme: light;
+    --page:#f9f9f7; --surface:#fcfcfb; --surface-2:#f2f1ec;
+    --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+    --grid:#e1e0d9; --line:#c3c2b7; --border:rgba(11,11,11,.10);
+    --featA:#2a78d6; --featB:#eb6834; --featC:#1baf7a;
+    --good:#0ca30c; --warn:#fab219; --crit:#d03b3b;
+    --code-bg:#f2f1ec;
+    --env1:#a3a19b; --env2:#7d7b76; --env3:#52514e; --env4:#0b0b0b;
+    --bg-tag:#f2f1ec; --bd-tag:#d6d4cd; --fg-tag:#52514e;
+    --bg-ok:#e7f5e7;  --bd-ok:#b7e0b7;  --fg-ok:#046a04;
+    --bg-warn:#fdf1d8;--bd-warn:#f2d089;--fg-warn:#8a5c00;
+    --bg-env:#eeedea; --bd-env:#d6d4cd; --fg-env:#52514e;
+    --bg-uat:#fdece3; --bd-uat:#f4c5a9; --fg-uat:#a1400f;
+    --bg-prod:#0b0b0b;--bd-prod:#0b0b0b;--fg-prod:#ffffff;
+    --bg-dim:#f2f1ec; --bd-dim:#e1e0d9; --fg-dim:#898781;
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --page:#0d0d0d; --surface:#1a1a19; --surface-2:#242422;
+    --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --line:#383835; --border:rgba(255,255,255,.10);
+    --featA:#3987e5; --featB:#d95926; --featC:#199e70;
+    --good:#0ca30c; --warn:#fab219; --crit:#d03b3b;
+    --code-bg:#242422;
+    --env1:#575652; --env2:#898781; --env3:#b8b6ae; --env4:#ffffff;
+    --bg-tag:#2a2a27; --bd-tag:#3d3d39; --fg-tag:#c3c2b7;
+    --bg-ok:#12331a;  --bd-ok:#1e5c2c;  --fg-ok:#5fd06a;
+    --bg-warn:#3a2e10;--bd-warn:#6e5615;--fg-warn:#f0bb45;
+    --bg-env:#2a2a27; --bd-env:#3d3d39; --fg-env:#c3c2b7;
+    --bg-uat:#3a2013; --bd-uat:#6e3a1d; --fg-uat:#eb9a6c;
+    --bg-prod:#ffffff;--bd-prod:#ffffff;--fg-prod:#0b0b0b;
+    --bg-dim:#242422; --bd-dim:#33332f; --fg-dim:#898781;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --page:#0d0d0d; --surface:#1a1a19; --surface-2:#242422;
+      --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
+      --grid:#2c2c2a; --line:#383835; --border:rgba(255,255,255,.10);
+      --featA:#3987e5; --featB:#d95926; --featC:#199e70;
+      --code-bg:#242422;
+      --env1:#575652; --env2:#898781; --env3:#b8b6ae; --env4:#ffffff;
+    --bg-tag:#2a2a27; --bd-tag:#3d3d39; --fg-tag:#c3c2b7;
+    --bg-ok:#12331a;  --bd-ok:#1e5c2c;  --fg-ok:#5fd06a;
+    --bg-warn:#3a2e10;--bd-warn:#6e5615;--fg-warn:#f0bb45;
+    --bg-env:#2a2a27; --bd-env:#3d3d39; --fg-env:#c3c2b7;
+    --bg-uat:#3a2013; --bd-uat:#6e3a1d; --fg-uat:#eb9a6c;
+    --bg-prod:#ffffff;--bd-prod:#ffffff;--fg-prod:#0b0b0b;
+    --bg-dim:#242422; --bd-dim:#33332f; --fg-dim:#898781;
+    }
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--page); color:var(--ink);
+    font:15px/1.7 system-ui,-apple-system,"Segoe UI","Noto Sans KR",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px 96px}
+  code,pre,.mono{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace}
+  code{background:var(--code-bg);padding:.12em .4em;border-radius:4px;font-size:.88em}
+  pre{background:var(--code-bg);border:1px solid var(--border);border-radius:10px;
+      padding:16px 18px;overflow-x:auto;font-size:12.5px;line-height:1.55;margin:0}
+  a{color:var(--featA)}
+  h2{font-size:22px;margin:0 0 6px;letter-spacing:-.01em}
+  h3{font-size:16px;margin:28px 0 10px}
+  p{margin:0 0 12px;color:var(--ink-2)}
+  .lead{color:var(--ink-2)}
+
+  /* ── header ── */
+  header{border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:20}
+  .hbar{max-width:1080px;margin:0 auto;padding:12px 24px;display:flex;align-items:center;gap:14px}
+  .brand{font-weight:650;font-size:14px;letter-spacing:-.01em}
+  .brand span{color:var(--muted);font-weight:400}
+  .spacer{flex:1}
+  .btn{background:var(--surface-2);border:1px solid var(--border);color:var(--ink-2);
+       border-radius:999px;padding:5px 13px;font-size:12.5px;cursor:pointer;font-family:inherit}
+  .btn:hover{color:var(--ink)}
+
+  /* ── hero ── */
+  .hero{padding:56px 0 40px;border-bottom:1px solid var(--border)}
+  .kicker{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+  h1{font-size:38px;line-height:1.22;margin:0 0 14px;letter-spacing:-.022em;font-weight:680}
+  .hero p{font-size:16px;max-width:66ch}
+  .proof{margin-top:26px;background:var(--surface);border:1px solid var(--border);
+         border-left:3px solid var(--good);border-radius:12px;padding:18px 20px}
+  .proof-row{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;font-size:13px}
+  .proof-row + .proof-row{margin-top:6px}
+  .proof-label{width:130px;flex:none;color:var(--muted);font-size:12px}
+  .proof-val{font-family:ui-monospace,monospace;font-size:12px;word-break:break-all;flex:1;min-width:280px}
+  .verdict{margin-top:14px;padding-top:14px;border-top:1px solid var(--border);
+           font-size:14px;font-weight:600;color:var(--good);display:flex;gap:8px;align-items:center}
+
+  /* ── sections ── */
+  section{padding:44px 0;border-bottom:1px solid var(--border)}
+  .num{display:inline-block;font-size:11.5px;letter-spacing:.1em;color:var(--muted);
+       margin-bottom:8px;font-family:ui-monospace,monospace}
+
+  /* ── table ── */
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--grid);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12px;letter-spacing:.02em;
+     border-bottom:1px solid var(--line);white-space:nowrap}
+  tbody tr:last-child td{border-bottom:none}
+  td.mono,th.mono{font-family:ui-monospace,monospace;font-size:12px}
+
+  /* ── env strip ── */
+  .strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;margin:22px 0 10px}
+  .stop{position:relative;padding:0 10px}
+  .stop::before{content:"";position:absolute;top:13px;left:0;right:0;height:2px;background:var(--grid)}
+  .stop:first-child::before{left:50%}
+  .stop:last-child::before{right:50%}
+  .dot{position:relative;width:14px;height:14px;border-radius:50%;margin:7px auto 12px;
+       border:2px solid var(--surface);box-shadow:0 0 0 1px var(--border)}
+  .stop-name{text-align:center;font-weight:650;font-size:14px;margin-bottom:3px}
+  .stop-kind{text-align:center;font-size:11.5px;color:var(--muted);margin-bottom:9px}
+  .stop-val{text-align:center;font-family:ui-monospace,monospace;font-size:11.5px;
+            background:var(--surface);border:1px solid var(--border);border-radius:7px;
+            padding:7px 6px;word-break:break-all;line-height:1.45}
+  .stop-note{text-align:center;font-size:11.5px;color:var(--muted);margin-top:7px;line-height:1.5}
+
+  /* ── kanban matrix ── */
+  .kanban th:not(:first-child),.kanban td:not(:first-child){text-align:center;width:14%}
+  .mark{font-weight:700;font-size:15px}
+  .mark.no{color:var(--muted);font-weight:400}
+  .feat{display:inline-flex;align-items:center;gap:8px}
+  .swatch{width:10px;height:10px;border-radius:3px;flex:none}
+
+  /* ── cards ── */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(258px,1fr));gap:14px;margin-top:18px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
+  .card h4{margin:0 0 8px;font-size:14px;display:flex;gap:8px;align-items:center}
+  .card p{margin:0;font-size:13px;line-height:1.65}
+  .card pre{margin-top:10px;font-size:11.5px;padding:11px 12px}
+  .tick{color:var(--good);font-weight:700}
+  .card.finding{border-left:3px solid var(--warn)}
+  .card.finding h4{color:var(--ink)}
+
+  .note{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--line);
+        border-radius:10px;padding:14px 18px;margin:16px 0;font-size:13.5px;color:var(--ink-2)}
+  .note strong{color:var(--ink)}
+
+  .graph-legend{display:flex;gap:18px;flex-wrap:wrap;margin:10px 0 14px;font-size:12.5px;color:var(--ink-2)}
+  .gwrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+         padding:6px 4px 10px;overflow-x:auto}
+  .gwrap svg{min-width:940px;display:block}
+  details.raw{margin-top:14px}
+  details.raw summary{cursor:pointer;font-size:13px;color:var(--ink-2);
+    background:var(--surface);border:1px solid var(--border);border-radius:9px;
+    padding:9px 14px;list-style:none;user-select:none}
+  details.raw summary::-webkit-details-marker{display:none}
+  details.raw summary::before{content:"▸ ";color:var(--muted)}
+  details.raw[open] summary::before{content:"▾ "}
+  details.raw pre{margin-top:10px}
+  .graph-legend span{display:inline-flex;align-items:center;gap:7px}
+
+  footer{padding:34px 0;color:var(--muted);font-size:12.5px}
+  @media (max-width:720px){
+    h1{font-size:28px}
+    .strip{grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 0}
+    .stop::before{display:none}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hbar">
+    <div class="brand">digest 동일성 검증 <span>· 조직 샌드박스 실행분</span></div>
+    <div class="spacer"></div>
+    <button class="btn" id="theme">라이트 / 다크</button>
+  </div>
+</header>
+
+<div class="wrap">
+
+<div class="hero">
+  <div class="kicker">2026-08-18 · trial-informatics 조직 레포 · 실제 GitHub Actions 실행</div>
+  <h1>UAT에서 검증한 그 이미지가<br>그대로 prod에 나갔다.</h1>
+  <p class="lead">
+    샌드박스를 조직 레포로 옮기고 <strong>jib → ghcr</strong>를 붙여 실전과 같은 조건으로 맞춘 뒤,
+    <strong>실제 컨테이너 이미지를 레지스트리에 올려</strong> 아래 값을 뽑았다 —
+    실전과 같은 <code>docker inspect --format='{{index .RepoDigests 0}}'</code> 명령이다.
+  </p>
+
+  <div class="proof">
+    <div class="proof-row">
+      <div class="proof-label">UAT 이미지<br><span style="font-weight:400">uat-v1.2.0-rc.1</span></div>
+      <div class="proof-val">sha256:cd9c4b1c91c9e4206723a80477c5fd11bbf6386d040cab83ee670387155ad59e</div>
+    </div>
+    <div class="proof-row">
+      <div class="proof-label">PROD 이미지<br><span style="font-weight:400">v1.2.0</span></div>
+      <div class="proof-val">sha256:cd9c4b1c91c9e4206723a80477c5fd11bbf6386d040cab83ee670387155ad59e</div>
+    </div>
+    <div class="verdict"><span>✓</span> digest 동일 — prod 워크플로가 <code>uat-v*</code> 태그를 훑어 자동 판정했다. 사람이 비교하지 않는다.</div>
+  </div>
+
+  <div class="note" style="margin-top:18px">
+    <strong>이게 왜 강한 증거인가.</strong> UAT는 <code>release-0818</code>의 커밋(<code>06681e6</code>)에서, prod는
+    <strong>master 머지 커밋(<code>001563e</code>)에서 각각 따로 빌드했다.</strong>
+    서로 다른 커밋에서 독립적으로 빌드한 두 이미지가 바이트 단위로 같다는 뜻이다.
+    이미지 안에 버전을 넣지 않았기 때문에 가능하다 — 버전은 컨테이너를 띄울 때 밖에서 알려준다.
+  </div>
+</div>
+
+<section>
+  <div class="num">01</div>
+  <h2>이번 런에서 실제로 돌아간 것</h2>
+  <p>조직 레포 <code>trial-informatics/git-branch-strategy-sandbox</code>에서 2026-08-18 18:08~18:26 (KST)
+     사이에 워크플로가 <strong>5회</strong> 실행됐다. 아래가 전부다.</p>
+  <table>
+    <thead><tr><th>환경</th><th>트리거</th><th>소스</th><th>이미지 태그</th><th>digest</th></tr></thead>
+    <tbody>
+      <tr><td>dev</td><td>push 자동</td><td class="mono">dev / 6356316</td><td class="mono">sha-6356316</td><td class="mono">—</td></tr>
+      <tr><td>dev</td><td>push 자동</td><td class="mono">dev / ecb699e</td><td class="mono">sha-ecb699e</td><td class="mono">—</td></tr>
+      <tr style="background:var(--surface)"><td><strong>uat</strong></td><td>dispatch</td><td class="mono">release-0818 / 06681e6</td>
+          <td class="mono">v1.2.0-rc.1</td><td class="mono">sha256:cd9c4b1c…</td></tr>
+      <tr style="background:var(--surface)"><td><strong>prod</strong></td><td>PR #2 merged</td><td class="mono">master / 001563e</td>
+          <td class="mono">v1.2.0</td><td class="mono">sha256:cd9c4b1c…</td></tr>
+      <tr><td>dev</td><td>push 자동</td><td class="mono">dev / f3c56fc</td><td class="mono">sha-f3c56fc</td><td class="mono">sha256:2f52460f…</td></tr>
+    </tbody>
+  </table>
+
+  <div class="cards">
+    <div class="card">
+      <h4><span class="tick">✓</span> merge commit 가드가 돌았다</h4>
+      <p>prod 워크플로가 master tip의 부모 수를 세어 Squash/Rebase merge를 잡아낸다.</p>
+      <pre>✅ merge commit (부모 2개) — same-SHA 유지</pre>
+    </div>
+    <div class="card">
+      <h4><span class="tick">✓</span> UAT 대조가 자동으로 판정했다</h4>
+      <p><code>uat-v*</code> 태그를 훑어 digest를 비교한다. 사람이 눈으로 맞추지 않는다.</p>
+      <pre>✅ digest 일치 — UAT(uat-v1.2.0-rc.1)에서
+   검증한 이미지가 그대로 나간다</pre>
+    </div>
+    <div class="card">
+      <h4><span class="tick">✓</span> 트리 SHA도 같다</h4>
+      <p>digest뿐 아니라 두 커밋의 트리 자체가 같다. 조립 이후 코드가 바뀌지 않았다는 뜻이다.</p>
+      <pre>06681e6 (release-0818) → 8f556711…
+001563e (master merge) → 8f556711…</pre>
+    </div>
+    <div class="card">
+      <h4><span class="tick">✓</span> 컨테이너가 실제로 떴다</h4>
+      <p>배포 스텝이 이미지를 <code>docker run</code>으로 띄우고 그 출력을 배포 요약에 남긴다.</p>
+      <pre>env     : prod
+version : v1.2.0
+registered features:
+  - baseline
+  - audit-log
+  - export-csv
+  - json-export</pre>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="num">02</div>
+  <h2>왜 같은 digest가 나올 수 있나</h2>
+  <p>UAT와 prod는 <strong>버전이 다르다</strong> — <code>1.2.0-rc.1</code>과 <code>1.2.0</code>.
+     그런데도 이미지가 같다. 설계를 그렇게 잡았기 때문이다.</p>
+
+  <div class="note">
+    <strong>버전은 이미지 안에 넣지 않는다.</strong> 버전 문자열을 이미지에 박아 두면 코드가 똑같아도
+    버전이 다르면 이미지가 달라진다. 그러면 “UAT에서 검증한 그 이미지가 그대로 나갔다”를
+    digest로 증명할 방법이 없어진다. 그래서 이미지는 자기 버전을 모르는 채로 만들고,
+    컨테이너를 띄울 때 <code>APP_VERSION</code>으로 알려준다. 같은 이미지가 UAT에서는
+    <code>1.2.0-rc.1</code>, prod에서는 <code>1.2.0</code>이라고 자기를 소개하지만
+    <strong>이미지는 한 개</strong>다 — 태그만 두 개 붙어 있을 뿐이다.
+  </div>
+
+  <p>구현은 두 조각이다. 앱은 환경변수를 1순위로 읽고, 워크플로가 실행 시점에 넘긴다.</p>
+<pre>// Version.java — 주입값 &gt; jar 내장 version.yml &gt; unknown
+String injected = System.getenv("APP_VERSION");
+
+# uat / prod 워크플로 — 빌드가 아니라 실행할 때 넘긴다
+docker run --rm \
+  -e APP_ENV=prod \
+  -e APP_VERSION="${VERSION}" \
+  -e APP_COMMIT="${BUILD_SHA}" \
+  -e APP_DIGEST="${DIGEST}" \
+  "${IMAGE}:${IMAGE_TAG}"</pre>
+
+  <div class="note">
+    <strong>복사한 게 아니라 따로 만들었는데 같았다.</strong> prod는 이미지를 <strong>다시 빌드했다.</strong>
+    그 결과 바이트가 UAT 것과 같아서, <code>…:v1.2.0-rc.1</code>과 <code>…:v1.2.0</code>이
+    레지스트리에서 <strong>같은 digest를 가리키는 두 이름</strong>이 됐다.
+    태그를 옮겨 단 것이었다면 이 값은 아무것도 증명하지 못한다.
+  </div>
+</section>
+
+<section>
+  <div class="num">03</div>
+  <h2>배포 원장 — git 태그가 기록이다</h2>
+  <p>Actions 로그는 90일이면 만료된다. annotated 태그는 영구다. 그래서 “무엇이 어디에 나갔나”를 태그 메시지에 통째로 적는다.</p>
+<pre>$ git show uat-v1.2.0-rc.1
+
+tag uat-v1.2.0-rc.1
+Tagger: github-actions[bot]
+
+UAT deploy — 1.2.0 (rc)
+
+env      : uat
+branch   : release-0818
+commit   : 06681e61180e62af2b3bb1ed1334ca29c1ba3aa0
+image    : ghcr.io/…/git-branch-strategy-sandbox:v1.2.0-rc.1
+digest   : sha256:cd9c4b1c91c9e4206723a80477c5fd11bbf6386d040cab83ee670387155ad59e
+jdk      : Amazon.com Inc. 17.0.20+8-LTS
+gradle   : 8.13
+base     : eclipse-temurin:17-jre
+base-dig : sha256:56cd3dfd4e99fed05a153a717847950a31b83621b62ef25a09f75bc4e5e8b67e
+run      : …/actions/runs/32121255464
+by       : yoonhyuk-jeong
+
+주의: 이 버전은 예보(forecast)다. 재조립으로 범위가 바뀌면 실제 prod 버전이 달라질 수 있고,
+그 불일치는 prod 배포 요약에서 경고로 드러난다.</pre>
+  <div class="note">
+    <strong>기록 항목은 사이클을 돌리며 늘어났다.</strong> 처음엔 digest·커밋뿐이었고,
+    <code>jdk</code>/<code>gradle</code>/<code>base-dig</code>는 “고정하지 말고 기록하자”로 방향을 정한 뒤 추가했다.
+    무엇을 왜 기록하는지는 <a href="#drift">05절</a> 참고.
+  </div>
+</section>
+
+<section>
+  <div class="num">04</div>
+  <h2>이번 런이 증명하지 않은 것</h2>
+  <p>이 런의 목적은 <strong>digest 추적 하나</strong>였다. v4 브랜치 플로우 자체는 여기서 돌리지 않았다.
+     섞어 읽지 않도록 빠진 것을 적어 둔다.</p>
+  <table>
+    <thead><tr><th>항목</th><th>이번 런</th><th>어디서 검증했나</th></tr></thead>
+    <tbody>
+      <tr><td>test 환경 배포</td>
+          <td><strong style="color:var(--fg-warn)">0회</strong> — PR #1로 test에 merge만 하고 dispatch는 돌리지 않았다</td>
+          <td><a href="./cycle-0818.html">0818 사이클 (개인 레포)</a></td></tr>
+      <tr><td>조립 PR 1건</td>
+          <td><strong style="color:var(--fg-warn)">없음</strong> — 기능이 1개라 <code>assemble/</code> 없이 feature → master로 바로 PR했다</td>
+          <td><a href="./cycle-0818.html">0818 사이클 (개인 레포)</a></td></tr>
+      <tr><td>칸반 (대기·추월)</td>
+          <td><strong style="color:var(--fg-warn)">없음</strong> — 기능 1개(IMTDEV-4004 json-export)</td>
+          <td><a href="./cycle-0818.html">0818 사이클 (개인 레포)</a></td></tr>
+      <tr><td>rerere 자동 재적용</td>
+          <td><strong style="color:var(--fg-warn)">없음</strong> — 기능이 1개라 충돌 자체가 나지 않았다</td>
+          <td><a href="./cycle-0818.html">0818 사이클 (개인 레포)</a></td></tr>
+    </tbody>
+  </table>
+  <div class="note">
+    <strong>왜 축약해서 돌렸나.</strong> v4 플로우는 개인 레포에서 이미 3개 기능으로 끝까지 돌려 뒀다.
+    조직 레포로 옮긴 목적은 <strong>jar <code>sha256sum</code>이 아니라 진짜 OCI digest로</strong>
+    같은 주장을 다시 세우는 것이었고, 그건 기능 1개로 충분하다.
+    두 축을 합친 런은 아직 돌리지 않았다.
+  </div>
+</section>
+
+<section>
+  <div class="num" id="drift">05</div>
+  <h2>샌드박스와 실전의 차이</h2>
+  <p>샌드박스는 조직 레포에 올려 실전과 최대한 같은 조건으로 맞췄다.
+     남은 차이는 <strong>두 줄뿐</strong>이고, 둘 다 이유가 분명하다.</p>
+  <table>
+    <thead><tr><th>항목</th><th>샌드박스</th><th>실전 image-trial-server</th></tr></thead>
+    <tbody>
+      <tr><td>이미지</td><td>jib → ghcr, 이동 태그 + 불변 태그 병행</td><td>동일</td></tr>
+      <tr><td>digest 출처</td><td><code>docker inspect --format='{{index .RepoDigests 0}}'</code></td><td>동일 명령</td></tr>
+      <tr><td>버전 발급</td><td><code>conventional-changelog-action</code></td><td>동일</td></tr>
+      <tr><td>브랜치 보호</td><td>실전 설정을 복제. 스크립트로 as-is ↔ v4 전환</td><td>원본</td></tr>
+      <tr><td>base 이미지</td><td>공개 이동 태그</td><td>사내 base, 역시 이동 태그</td></tr>
+      <tr style="background:var(--surface)"><td><strong>배포 대상</strong></td>
+          <td>러너에서 <code>docker run</code> 1회</td>
+          <td>self-hosted 러너 + Blue-Green + ALB 전환</td></tr>
+      <tr style="background:var(--surface)"><td><strong>릴리스 봇 권한</strong></td>
+          <td><code>GITHUB_TOKEN</code> — 브랜치 보호를 우회하지 못한다</td>
+          <td>org GitHub App 토큰으로 우회</td></tr>
+    </tbody>
+  </table>
+  <div class="note">
+    <strong>봇 권한이 왜 남은 차이인가.</strong> 실전은 릴리스 봇이 org GitHub App 토큰으로
+    보호를 우회해 <code>chore(release)</code> 커밋을 master에 push한다. 샌드박스는 그 앱의 private key가 없고,
+    <code>GITHUB_TOKEN</code>(<code>github-actions[bot]</code>)은 <strong>우회 허용 목록에 등록조차 되지 않는다</strong> —
+    API가 조용히 무시한다(확인함). 그래서 샌드박스는 master의 PR 요구만 뺀 별도 프로필로 돌린다.
+  </div>
+
+  <h3>빌드 입력 중 무엇이 움직일 수 있나</h3>
+  <p>실전 <code>image-trial-server</code>를 실제로 확인한 결과다.</p>
+  <table>
+    <thead><tr><th>입력</th><th>고정돼 있나</th></tr></thead>
+    <tbody>
+      <tr><td>Gradle 의존성</td><td><span style="color:var(--fg-ok);font-weight:700">고정</span> — 동적 버전(<code>+</code>, <code>latest</code>, 범위) 없음</td></tr>
+      <tr><td>base 이미지</td><td><strong>실질 고정</strong> — <code>ti-server-base:java17-gdcm</code>은 어느 워크플로도 재빌드하지 않는다.
+          digest가 아니라 <strong>태그</strong>로 참조하므로 레지스트리가 불변을 보장하진 않는다 — 관행이지 규칙이 아니다</td></tr>
+      <tr><td><strong>빌드 JDK</strong></td><td><span style="color:var(--fg-warn);font-weight:700">고정 아님</span> —
+          <code>java-version: '17'</code>은 <strong>최신 패치로 해석된다</strong>
+          (실행 로그: <code>Resolved latest version as 17.0.20+8.1</code>).
+          <code>corretto</code> 배포판은 setup-java에서 <strong>major 버전만</strong> 지정할 수 있어 패치 고정이 아예 불가능하다</td></tr>
+    </tbody>
+  </table>
+
+  <h3>그래서 고정하지 않고 기록한다</h3>
+  <p>JDK를 고정하면 CVE 패치를 자동으로 못 받는다. 그래서 <strong>고정(prevention) 대신 감지(detection)</strong>를 택했다 —
+     빌드 JDK와 Gradle 버전을 배포 원장에 남기고, digest가 어긋나면 <strong>무엇이 움직였는지 지목한다.</strong></p>
+  <div class="cards">
+    <div class="card"><h4>소스 트리가 다르다</h4>
+      <p>UAT 태그가 가리키는 트리 SHA ≠ prod 빌드 커밋의 트리 SHA.
+         조립 이후 코드가 바뀐 것 — <strong>가장 심각한 경우</strong>다.</p></div>
+    <div class="card"><h4>빌드 JDK가 움직였다</h4>
+      <p>트리는 같은데 기록된 JDK가 다르다. 소스는 그대로이고 컴파일러만 바뀐 것.</p></div>
+    <div class="card"><h4>기록 안 된 변수가 움직였다</h4>
+      <p>트리도 JDK도 같은데 digest가 다르다. base 이미지 등 아직 기록하지 않는 입력을 의심한다.</p></div>
+    <div class="card"><h4>UAT 미경유</h4>
+      <p>이 버전으로 UAT에 올린 기록 자체가 없다. v4 금지규칙 7 위반.</p></div>
+  </div>
+  <div class="note">
+    이 4가지 분기를 실제 태그를 대상으로 전부 돌려 확인했다.
+    digest가 갈리는 것은 <strong>결함이 아니라 측정값</strong>이다 — 갈렸다는 사실과 그 원인이 곧 알아야 할 정보다.
+  </div>
+</section>
+
+<section>
+  <div class="num">06</div>
+  <h2>v4를 켜려면 레포 설정 3개를 바꿔야 한다</h2>
+  <p>샌드박스를 실전 설정으로 맞춰 보고 알았다. 지금 <code>image-trial-server</code> 설정은
+     <strong>v4와 정면으로 충돌한다.</strong></p>
+
+  <table>
+    <thead><tr><th>설정</th><th>실전 현재</th><th>v4 요구</th></tr></thead>
+    <tbody>
+      <tr><td>Squash merge</td><td>허용</td><td>비활성</td></tr>
+      <tr><td>Rebase merge</td><td>허용</td><td>비활성</td></tr>
+      <tr><td>master <code>required_linear_history</code></td>
+          <td><strong style="color:var(--fg-warn)">켜짐</strong></td>
+          <td><strong>꺼야 함</strong></td></tr>
+    </tbody>
+  </table>
+
+  <p><code>required_linear_history</code> 는 <strong>“merge commit 금지”</strong> 다.
+     v4 금지규칙 8(“모든 merge는 Merge Commit”)과 정반대다.
+     그런데 master에는 merge commit이 실제로 존재한다 — <code>enforce_admins</code> 가 꺼져 있어
+     <strong>관리자만 우회해 merge commit을 만들고 있는 상태</strong>로 보인다(이 인과관계는 추정이다).
+     일반 개발자가 v4대로 merge하면 막힐 가능성이 높다.</p>
+
+  <h3>순서가 정해져 있다 — 422를 맞고 알아낸 것</h3>
+  <p><code>required_linear_history</code> 가 켜진 상태에서는 squash/rebase를 <strong>끌 수 없다.</strong></p>
+<pre>PATCH /repos/{owner}/{repo}  {"allow_squash_merge": false, "allow_rebase_merge": false}
+
+422 Validation Failed
+  Sorry, you need to allow either squash or rebase merge strategies, or both.
+  (protected_branch_policy)</pre>
+  <p>linear history가 merge commit을 막고 있는데 squash/rebase까지 끄면 <strong>병합 수단이 하나도 안 남기</strong> 때문이다.
+     그래서 전환 절차서에는 순서를 명시해야 한다.</p>
+
+  <div class="cards">
+    <div class="card">
+      <h4>v4로 갈 때</h4>
+      <p><strong>1.</strong> master 브랜치 보호에서 <code>required_linear_history</code> 끄기<br>
+         <strong>2.</strong> 그 다음 Squash / Rebase merge 비활성</p>
+    </div>
+    <div class="card">
+      <h4>되돌릴 때</h4>
+      <p>반대 순서. <strong>1.</strong> Squash / Rebase 먼저 켜고<br>
+         <strong>2.</strong> 그 다음 <code>required_linear_history</code> 켜기</p>
+    </div>
+  </div>
+
+  <div class="note">
+    샌드박스에는 두 상태를 오가는 스크립트를 넣어 뒀다 —
+    <code>./scripts/repo-settings.sh as-is</code> 로 실전의 지금 상태를 재현하고,
+    <code>to-be</code> 로 v4 상태로 넘긴다. 왕복 전환을 반복 실행해 멱등한지 확인했다.
+    발표 중에 <strong>실제로 막히는 것과 풀리는 것을 라이브로</strong> 보여줄 수 있다.
+  </div>
+
+  <div class="note">
+    <strong>샌드박스에는 프로필이 하나 더 있다 — <code>solo</code>.</strong>
+    실전은 릴리스 봇이 org GitHub App 토큰으로 보호를 우회해 <code>chore(release)</code> 커밋을 master에 push한다.
+    샌드박스에는 그 App의 private key가 없고 <code>GITHUB_TOKEN</code>은 우회 허용 목록에 등록조차 되지 않는다.
+    그래서 <code>solo</code> = <code>to-be</code>에서 <strong>master의 PR 요구만 뺀</strong> 프로필로 파이프라인을 끝까지 돌린다.
+    App 시크릿이 준비되면 <code>to-be</code>로 넘어간다 — 위 표의 3개 설정은 세 프로필 모두 동일하다.
+  </div>
+</section>
+
+<footer>
+  실행: 2026-08-18 · 실행 환경 <code>trial-informatics/git-branch-strategy-sandbox</code> (조직 레포, private) ·
+  이 페이지는 <strong>공개용 사본</strong>이다 — 사내 운영 수치는 제외했다 ·
+  규칙 원본은 <a href="https://trialinformatics.atlassian.net/wiki/spaces/ImageTrial/pages/716800002">Confluence — IMT Git Branch 전략 v4</a> ·
+  <a href="./v4-flow.html">v4 전략 시각 설명 →</a> ·
+  <a href="./cycle-0818.html">0818 사이클 실행 기록 →</a>
+</footer>
+
+</div>
+
+<script>
+(function(){
+  var root = document.documentElement;
+  var saved = null;
+  try { saved = localStorage.getItem('theme'); } catch(e) {}
+  if (saved) root.setAttribute('data-theme', saved);
+  else root.removeAttribute('data-theme');   // OS 설정을 따른다
+
+  document.getElementById('theme').addEventListener('click', function(){
+    var isDark = getComputedStyle(root).getPropertyValue('color-scheme').trim() === 'dark';
+    var next = isDark ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+  });
+})();
+</script>
+</body>
+</html>
